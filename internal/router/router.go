@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/ioncode/go_short/internal/handler"
+	"github.com/ioncode/go_short/internal/repository"
+	"github.com/ioncode/go_short/internal/service"
 )
 
 func middleware(next http.Handler) http.Handler {
@@ -19,10 +21,18 @@ func middleware(next http.Handler) http.Handler {
 	})
 }
 
+type Server struct {
+	ShortnerService service.Shortner
+}
+
 func Serve() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(`GET /`, handler.Get)
+	repo := repository.NewMapRepository()
+
+	service := service.NewShortner(repo)
+
+	mux.HandleFunc(`GET /`, handler.Get(service))
 	mux.HandleFunc(`POST /`, handler.Post)
 
 	log.Fatal(http.ListenAndServe(":8080", middleware(mux)))

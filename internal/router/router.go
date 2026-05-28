@@ -32,8 +32,8 @@ func Serve() {
 
 	service := service.NewShortner(repo)
 
-	mux.HandleFunc(`GET /`, handler.Get(service))
-	mux.HandleFunc(`POST /`, handler.Post)
+	mux.HandleFunc(`GET /{alias}`, handler.Get(service))
+	mux.HandleFunc(`POST /`, handler.Post(service))
 
 	log.Fatal(http.ListenAndServe(":8080", middleware(mux)))
 }

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -13,9 +14,12 @@ type GetService interface {
 
 func Get(s GetService) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		alias := model.ShortUrl(req.PathValue("alias"))
-		log.Println("Started get request handler with alias " + alias)
+		path := req.PathValue("alias")
+		log.Println("Started get request handler with path " + path)
+		alias := model.ShortUrl(path)
+		log.Println("alias: " + alias)
 		site, error := s.Get(alias)
+		fmt.Printf("%#v\n", site)
 
 		if error != nil {
 			http.Error(res, string(alias)+": "+error.Error(), http.StatusBadRequest)

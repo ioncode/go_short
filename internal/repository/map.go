@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ioncode/go_short/internal/model"
 )
@@ -62,5 +63,18 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 		return ErrSiteExists
 	}
 	r.sites.Data[site.ShortUrl] = site
+	fmt.Printf("%#v\n", r)
 	return nil
+}
+
+func (r *MapRepository) GetByUrl(url model.Url) (model.Site, bool) {
+
+	for _, site := range r.sites.Data {
+		if site.Url == url {
+			return site, true
+		}
+	}
+
+	return model.Site{}, false
+
 }

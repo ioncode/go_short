@@ -22,6 +22,7 @@ func StringWithCharset(length int) string {
 type SiteRepository interface {
 	GetByAlias(alias model.ShortUrl) (model.Site, error)
 	StoreSite(site model.Site) error
+	GetByUrl(url model.Url) (model.Site, bool)
 }
 
 // service interface
@@ -47,10 +48,14 @@ func (s *MapShortner) Get(alias model.ShortUrl) (model.Site, error) {
 
 func (s *MapShortner) Short(Url model.Url) (model.ShortUrl, error) {
 
-	//todo check if site allready stored
+	site, allreadystored := s.repository.GetByUrl(Url)
+
+	if allreadystored {
+		return site.ShortUrl, nil
+	}
 
 	alias := model.ShortUrl(StringWithCharset(8))
-	site := model.Site{
+	site = model.Site{
 		Url:      Url,
 		ShortUrl: alias,
 	}

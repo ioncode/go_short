@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -13,6 +14,7 @@ type ShortService interface {
 
 func Post(s ShortService) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
+		log.Println("Started Post handler")
 		body, error := io.ReadAll(req.Body)
 		if error != nil {
 			http.Error(res, error.Error(), http.StatusBadRequest)

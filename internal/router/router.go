@@ -2,6 +2,7 @@ package router
 
 import (
 	"log"
+	"mime"
 	"net/http"
 
 	"github.com/ioncode/go_short/internal/handler"
@@ -13,8 +14,15 @@ func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		contentType := r.Header.Get("Content-type")
-		if contentType != "text/plain" {
+		mediaType, _, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			http.Error(w, "Invalid Content-Type header", http.StatusBadRequest)
+			log.Println("Error parsing content type:", contentType)
+			return
+		}
+		if mediaType != "text/plain" {
 			http.Error(w, "Content type not correct", http.StatusBadRequest)
+			log.Println("Invalid content type for request: ", contentType, mediaType)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")

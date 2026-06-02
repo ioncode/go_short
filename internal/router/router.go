@@ -17,6 +17,7 @@ func middleware(next http.Handler) http.Handler {
 			http.Error(w, "Content type not correct", http.StatusBadRequest)
 			return
 		}
+		w.Header().Set("Content-Type", "text/plain")
 		next.ServeHTTP(w, r)
 	})
 }

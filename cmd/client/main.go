@@ -36,7 +36,7 @@ func main() {
 		panic(err)
 	}
 	// в заголовках запроса указываем кодировку
-	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Add("Content-Type", "text/plain")
 	// отправляем запрос и получаем ответ
 	response, err := client.Do(request)
 	if err != nil {

@@ -18,10 +18,12 @@ func Post(s ShortService) http.HandlerFunc {
 		body, error := io.ReadAll(req.Body)
 		if error != nil {
 			http.Error(res, error.Error(), http.StatusBadRequest)
+			return
 		}
 		alias, error := s.Short(model.Url(body))
 		if error != nil {
 			http.Error(res, error.Error(), http.StatusBadRequest)
+			return
 		}
 		res.WriteHeader(http.StatusCreated)
 		res.Write([]byte("http://localhost:8080/" + alias))

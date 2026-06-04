@@ -13,6 +13,7 @@ import (
 func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "text/plain")
 		log.Println("Middleware processing request with length ", r.ContentLength)
 		if r.ContentLength > 700 {
 			http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
@@ -31,8 +32,6 @@ func middleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-
-		w.Header().Set("Content-Type", "text/plain")
 		next.ServeHTTP(w, r)
 	})
 }

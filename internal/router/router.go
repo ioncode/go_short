@@ -41,6 +41,11 @@ type Server struct {
 }
 
 func Serve() {
+	router := SetupRouter()
+	log.Fatal(http.ListenAndServe(":8080", middleware(router)))
+}
+
+func SetupRouter() http.Handler {
 	mux := http.NewServeMux()
 
 	repo := repository.NewMapRepository()
@@ -49,6 +54,5 @@ func Serve() {
 
 	mux.HandleFunc(`GET /{alias}`, handler.Get(service))
 	mux.HandleFunc(`POST /`, handler.Post(service))
-
-	log.Fatal(http.ListenAndServe(":8080", middleware(mux)))
+	return mux
 }

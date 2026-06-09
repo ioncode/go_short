@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/service"
@@ -45,7 +46,7 @@ type Server struct {
 
 func Serve() {
 	router := SetupRouter()
-	log.Fatal(http.ListenAndServe(":8080", middleware(router)))
+	log.Fatal(http.ListenAndServe(config.ServerAddress, middleware(router)))
 }
 
 func SetupRouter() http.Handler {

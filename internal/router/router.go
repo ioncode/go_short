@@ -5,6 +5,8 @@ import (
 	"mime"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/service"
@@ -19,6 +21,7 @@ func middleware(next http.Handler) http.Handler {
 			http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
 			return
 		} else if r.ContentLength > 0 {
+			//written before chi router , can be deleted
 			contentType := r.Header.Get("Content-type")
 			mediaType, _, err := mime.ParseMediaType(contentType)
 			if err != nil {
@@ -46,13 +49,11 @@ func Serve() {
 }
 
 func SetupRouter() http.Handler {
-	mux := http.NewServeMux()
-
 	repo := repository.NewMapRepository()
-
 	service := service.NewShortner(repo)
 
-	mux.HandleFunc(`GET /{alias}`, handler.Get(service))
-	mux.HandleFunc(`POST /`, handler.Post(service))
-	return mux
+	router := chi.NewRouter()
+	router.Get("/{alias}", handler.Get(service))
+	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service))
+	return router
 }

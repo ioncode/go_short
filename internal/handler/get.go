@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/ioncode/go_short/internal/model"
 )
 
@@ -14,7 +15,7 @@ type GetService interface {
 
 func Get(s GetService) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		path := req.PathValue("alias")
+		path := chi.URLParam(req, "alias")
 		log.Println("Started get request handler with path " + path)
 		alias := model.ShortUrl(path)
 		log.Println("alias: " + alias)

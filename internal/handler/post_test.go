@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/model"
 )
@@ -22,6 +23,7 @@ func (m *MockService) Short(url model.Url) (model.ShortUrl, error) {
 }
 func TestPost(t *testing.T) {
 
+	config.ParseFlags()
 	tests := []struct {
 		name           string
 		expectedStatus int

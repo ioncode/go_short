@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/router"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,6 +16,7 @@ import (
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
 	srv := httptest.NewServer(router.SetupRouter())
+	config.ParseFlags()
 	// останавливаем сервер после завершения теста
 	defer srv.Close()
 

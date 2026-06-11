@@ -17,10 +17,10 @@ func Get(s GetService) http.HandlerFunc {
 		path := chi.URLParam(req, "alias")
 		log.Println("Started get request handler with path " + path)
 		alias := model.ShortUrl(path)
-		site, error := s.Get(alias)
+		site, err := s.Get(alias)
 
-		if error != nil {
-			http.Error(res, string(alias)+": "+error.Error(), http.StatusBadRequest)
+		if err != nil {
+			http.Error(res, string(alias)+": "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		http.Redirect(res, req, string(site.Url), http.StatusTemporaryRedirect)

@@ -52,7 +52,7 @@ func TestPost(t *testing.T) {
 			service := &MockService{
 				MockShort: tt.mockBehavior,
 			}
-			handler := handler.Post(service)
+			handler := handler.Post(service, "http://localhost:8080/")
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)

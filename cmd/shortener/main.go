@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	config.ParseFlags()
+	config := config.ParseFlags()
 	log.Println("Running server on", config.ServerAddress)
-	router.Serve()
+	router.Serve(config)
 }

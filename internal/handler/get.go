@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -18,9 +17,7 @@ func Get(s GetService) http.HandlerFunc {
 		path := chi.URLParam(req, "alias")
 		log.Println("Started get request handler with path " + path)
 		alias := model.ShortUrl(path)
-		log.Println("alias: " + alias)
 		site, error := s.Get(alias)
-		fmt.Printf("%#v\n", site)
 
 		if error != nil {
 			http.Error(res, string(alias)+": "+error.Error(), http.StatusBadRequest)

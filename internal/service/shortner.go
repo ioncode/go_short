@@ -9,7 +9,7 @@ import (
 // fast random string generator
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func StringWithCharset(length int) string {
+func stringWithCharset(length int) string {
 	b := make([]byte, length)
 	for i := range b {
 		// Use IntN to pick a random index from the charset
@@ -54,7 +54,7 @@ func (s *MapShortner) Short(Url model.Url) (model.ShortUrl, error) {
 		return site.ShortUrl, nil
 	}
 
-	alias := model.ShortUrl(StringWithCharset(8))
+	alias := model.ShortUrl(stringWithCharset(8))
 	site = model.Site{
 		Url:      Url,
 		ShortUrl: alias,

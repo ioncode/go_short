@@ -15,8 +15,10 @@ import (
 
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
-	srv := httptest.NewServer(router.SetupRouter())
-	config.ParseFlags()
+	srv := httptest.NewServer(router.SetupRouter(config.Config{
+		ServerAddress: ":8080",
+		ShortBaseUrl:  "http://localhost:8080/",
+	}))
 	// останавливаем сервер после завершения теста
 	defer srv.Close()
 

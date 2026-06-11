@@ -44,17 +44,17 @@ type Server struct {
 	ShortnerService service.Shortner
 }
 
-func Serve() {
-	router := SetupRouter()
+func Serve(config config.Config) {
+	router := SetupRouter(config)
 	log.Fatal(http.ListenAndServe(config.ServerAddress, middleware(router)))
 }
 
-func SetupRouter() http.Handler {
+func SetupRouter(config config.Config) http.Handler {
 	repo := repository.NewMapRepository()
 	service := service.NewShortner(repo)
 
 	router := chi.NewRouter()
 	router.Get("/{alias}", handler.Get(service))
-	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service))
+	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
 	return router
 }

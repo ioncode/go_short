@@ -37,10 +37,10 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository()
 			r.StoreSite(tt.want)
-			got, gotSite := r.GetByUrl(tt.url)
-			if gotSite != true {
+			got, gotError := r.GetByUrl(tt.url)
+			if gotError != nil {
 				if !tt.wantError {
-					t.Errorf("GetByUrl() failed: %v", gotSite)
+					t.Errorf("GetByUrl() failed: %v", gotError)
 				}
 				return
 			}
@@ -124,15 +124,14 @@ func TestMapRepository_StoreSite(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	r := repository.NewMapRepository()
-	r.StoreSite(model.Site{
-		Url:      "yandex.ru",
-		ShortUrl: "sfdsfgd",
-	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
+			r := repository.NewMapRepository()
+			r.StoreSite(model.Site{
+				Url:      "yandex.ru",
+				ShortUrl: "sfdsfgd",
+			})
 			gotErr := r.StoreSite(tt.site)
 			if gotErr != nil {
 				if !tt.wantErr {

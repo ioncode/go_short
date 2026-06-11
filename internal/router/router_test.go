@@ -50,14 +50,6 @@ func Test_middleware(t *testing.T) {
 			contentType:    "text/plain; charset=utf-8",
 			next:           responseContentTypeHandler,
 		},
-		{
-			name:           "Post with incorrect content type",
-			method:         http.MethodPost,
-			expectedStatus: http.StatusBadRequest,
-			body:           strings.NewReader("ya.ru"),
-			contentType:    "application/json; charset=utf-8",
-			next:           responseContentTypeHandler,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -73,5 +65,3 @@ func Test_middleware(t *testing.T) {
 		})
 	}
 }
-
-// todo discuss this

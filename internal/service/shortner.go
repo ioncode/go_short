@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log"
 	"math/rand/v2"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -22,44 +23,42 @@ func stringWithCharset(length int) string {
 type SiteRepository interface {
 	GetByAlias(alias model.ShortUrl) (model.Site, error)
 	StoreSite(site model.Site) error
-	GetByUrl(url model.Url) (model.Site, bool)
-}
-
-// service interface
-type Shortner interface {
-	Short(model.Url) (model.ShortUrl, error)
+	GetByUrl(url model.Url) (model.Site, error)
 }
 
 // service struct
-type MapShortner struct {
+type Shortner struct {
 	repository SiteRepository
 }
 
 // service constructor with DI
-func NewShortner(r SiteRepository) *MapShortner {
-	return &MapShortner{
+func NewShortner(r SiteRepository) *Shortner {
+	return &Shortner{
 		repository: r,
 	}
 }
 
-func (s *MapShortner) Get(alias model.ShortUrl) (model.Site, error) {
+func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
 	return s.repository.GetByAlias(alias)
 }
 
-func (s *MapShortner) Short(Url model.Url) (model.ShortUrl, error) {
+func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 
-	site, allreadystored := s.repository.GetByUrl(Url)
+	site, err := s.repository.GetByUrl(url)
 
-	if allreadystored {
+	if err == nil {
 		return site.ShortUrl, nil
 	}
 
 	alias := model.ShortUrl(stringWithCharset(8))
+	for _, err := s.repository.GetByAlias(alias); err == nil; alias = model.ShortUrl(stringWithCharset(8)) {
+		log.Println("This alias allready taken, generating new one", alias)
+	}
 	site = model.Site{
-		Url:      Url,
+		Url:      url,
 		ShortUrl: alias,
 	}
-	err := s.repository.StoreSite(site)
+	err = s.repository.StoreSite(site)
 
 	return site.ShortUrl, err
 }

@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/ioncode/go_short/internal/model"
 )
@@ -26,6 +27,11 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 			return
 		}
 		res.WriteHeader(http.StatusCreated)
-		res.Write([]byte(model.ShortUrl(shortBaseURL) + alias))
+		url, err := url.JoinPath(shortBaseURL, string(alias))
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusBadRequest)
+			return
+		}
+		res.Write([]byte(url))
 	}
 }

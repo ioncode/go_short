@@ -15,14 +15,14 @@ type ShortService interface {
 func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		log.Println("Started Post handler")
-		body, error := io.ReadAll(req.Body)
-		if error != nil {
-			http.Error(res, error.Error(), http.StatusBadRequest)
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
-		alias, error := s.Short(model.Url(body))
-		if error != nil {
-			http.Error(res, error.Error(), http.StatusBadRequest)
+		alias, err := s.Short(model.Url(body))
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
 		res.WriteHeader(http.StatusCreated)

@@ -59,7 +59,7 @@ func (s *MapShortner) Short(Url model.Url) (model.ShortUrl, error) {
 		Url:      Url,
 		ShortUrl: alias,
 	}
-	error := s.repository.StoreSite(site)
+	err := s.repository.StoreSite(site)
 
-	return site.ShortUrl, error
+	return site.ShortUrl, err
 }

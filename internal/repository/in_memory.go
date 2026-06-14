@@ -19,7 +19,9 @@ type MapRepository struct {
 }
 
 func NewMapRepository() *MapRepository {
-	return &MapRepository{}
+	return &MapRepository{
+		sites: make(map[model.ShortUrl]model.Site),
+	}
 }
 
 func (r *MapRepository) GetByAlias(alias model.ShortUrl) (model.Site, error) {
@@ -36,9 +38,6 @@ func (r *MapRepository) GetByAlias(alias model.ShortUrl) (model.Site, error) {
 func (r *MapRepository) StoreSite(site model.Site) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	if r.sites == nil {
-		r.sites = map[model.ShortUrl]model.Site{}
-	}
 	if _, ok := r.sites[site.ShortUrl]; ok {
 		return ErrSiteExists
 	}

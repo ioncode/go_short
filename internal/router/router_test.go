@@ -50,13 +50,22 @@ func Test_middleware(t *testing.T) {
 			contentType:    "text/plain; charset=utf-8",
 			next:           responseContentTypeHandler,
 		},
+		{
+			name:           "Post with correct content type and too large body",
+			method:         http.MethodPost,
+			expectedStatus: http.StatusRequestEntityTooLarge,
+			body:           strings.NewReader(strings.Repeat("S", 1000)),
+			contentType:    "text/plain; charset=utf-8",
+			next:           responseContentTypeHandler,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/", tt.body)
 			req.Header.Set("Content-type", tt.contentType)
 			rec := httptest.NewRecorder()
-			middleware(tt.next).ServeHTTP(rec, req)
+			middleware := requestContentLengthMiddleware(responseHeadersMiddleware(tt.next))
+			middleware.ServeHTTP(rec, req)
 			res := rec.Result()
 			defer res.Body.Close()
 			if res.StatusCode != tt.expectedStatus {

@@ -12,10 +12,16 @@ import (
 	"github.com/ioncode/go_short/internal/service"
 )
 
-func middleware(next http.Handler) http.Handler {
+func responseHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "text/plain")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func requestContentLengthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Middleware processing request with length ", r.ContentLength)
 		if r.ContentLength > 700 {
 			http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
@@ -27,7 +33,7 @@ func middleware(next http.Handler) http.Handler {
 
 func Serve(config config.Config) {
 	router := SetupRouter(config)
-	log.Fatal(http.ListenAndServe(config.ServerAddress, middleware(router)))
+	log.Fatal(http.ListenAndServe(config.ServerAddress, requestContentLengthMiddleware(responseHeadersMiddleware(router))))
 }
 
 func SetupRouter(config config.Config) http.Handler {

@@ -3,6 +3,7 @@ package service
 import (
 	"log"
 	"math/rand/v2"
+	"sync"
 
 	"github.com/ioncode/go_short/internal/model"
 )
@@ -29,6 +30,7 @@ type SiteRepository interface {
 // service struct
 type Shortner struct {
 	repository SiteRepository
+	mutex      sync.Mutex
 }
 
 // service constructor with DI
@@ -43,6 +45,8 @@ func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
 }
 
 func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
 	site, err := s.repository.GetByUrl(url)
 
@@ -51,8 +55,11 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 	}
 
 	alias := model.ShortUrl(stringWithCharset(8))
-	for _, err := s.repository.GetByAlias(alias); err == nil; alias = model.ShortUrl(stringWithCharset(8)) {
+	_, err = s.repository.GetByAlias(alias)
+	for err == nil {
 		log.Println("This alias allready taken, generating new one", alias)
+		alias = model.ShortUrl(stringWithCharset(8))
+		_, err = s.repository.GetByAlias(alias)
 	}
 	site = model.Site{
 		Url:      url,

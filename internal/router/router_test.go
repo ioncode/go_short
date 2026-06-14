@@ -1,8 +1,8 @@
 package router
 
 import (
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,8 +12,8 @@ import (
 func Test_middleware(t *testing.T) {
 
 	responseContentTypeHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("%#v\n", r.Header)
-		fmt.Printf("%#v\n", w)
+		log.Printf("%#v\n", r.Header)
+		log.Printf("%#v\n", w)
 		contentType := w.Header().Get("Content-type")
 		if contentType != "text/plain" {
 			t.Error("Content type not correct:", contentType)
@@ -31,8 +31,8 @@ func Test_middleware(t *testing.T) {
 		{
 			name: "Get request without payload",
 			next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Printf("%#v\n", r.Header)
-				fmt.Printf("%#v\n", w)
+				log.Printf("%#v\n", r.Header)
+				log.Printf("%#v\n", w)
 				contentType := w.Header().Get("Content-type")
 				if contentType != "text/plain" {
 					t.Error("Content type not correct:", contentType)

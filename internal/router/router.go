@@ -8,6 +8,7 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/handler"
+	"github.com/ioncode/go_short/internal/logger"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/service"
 )
@@ -33,7 +34,7 @@ func requestContentLengthMiddleware(next http.Handler) http.Handler {
 
 func Serve(config config.Config) {
 	router := SetupRouter(config)
-	log.Fatal(http.ListenAndServe(config.ServerAddress, requestContentLengthMiddleware(responseHeadersMiddleware(router))))
+	log.Fatal(http.ListenAndServe(config.ServerAddress, logger.ResponseLogger(logger.RequestLogger(requestContentLengthMiddleware(responseHeadersMiddleware(router))))))
 }
 
 func SetupRouter(config config.Config) http.Handler {

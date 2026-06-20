@@ -3,6 +3,7 @@ package router
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -16,7 +17,13 @@ import (
 func responseHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Content-Type", "text/plain")
+
+		if strings.HasPrefix(r.RequestURI, "/api/") {
+			w.Header().Set("Content-Type", "application/json")
+		} else {
+			w.Header().Set("Content-Type", "text/plain")
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -44,5 +51,6 @@ func SetupRouter(config config.Config) http.Handler {
 	router := chi.NewRouter()
 	router.Get("/{alias}", handler.Get(service))
 	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
+	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.ApiPost(service, config.ShortBaseUrl))
 	return router
 }

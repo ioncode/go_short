@@ -40,6 +40,7 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 func ApiPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		log.Println("Started Api Post handler")
+		res.Header().Set("Content-Type", "application/json")
 		var requestModel model.PostRequest
 		decoder := json.NewDecoder(req.Body)
 		decoder.DisallowUnknownFields()
@@ -70,7 +71,6 @@ func ApiPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 
 // utility function instead http.Error with the same signature
 func writeJSONError(w http.ResponseWriter, msg string, status int) {
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(model.ErrorResponse{Error: msg})
 }

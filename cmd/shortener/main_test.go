@@ -34,13 +34,15 @@ func Test_main(t *testing.T) {
 	log.Println(alias)
 
 	tests := []struct {
-		name             string
-		method           string
-		path             string
-		body             string
-		expectedCode     int
-		expectedLocation string
-		expectedBody     string
+		name                string
+		method              string
+		path                string
+		body                string
+		expectedCode        int
+		expectedLocation    string
+		expectedBody        string
+		contentType         string
+		expectedContentType string
 	}{
 		{
 			name:         "Short new site",
@@ -70,11 +72,33 @@ func Test_main(t *testing.T) {
 			expectedCode: http.StatusCreated,
 			expectedBody: "http://localhost:8080/" + alias,
 		},
+		{
+			name:                "Short site via JSON REST API",
+			method:              http.MethodPost,
+			path:                "/api/shorten",
+			body:                `{"url": "Https://practicum.yandex.Ru"}`,
+			expectedCode:        http.StatusCreated,
+			contentType:         "application/json",
+			expectedContentType: "application/json",
+		},
+		{
+			name:                "Payload error in JSON REST API",
+			method:              http.MethodPost,
+			path:                "/api/shorten",
+			body:                `{"badkey": "Https://practicum.yandex.Ru"}`,
+			expectedCode:        http.StatusBadRequest,
+			contentType:         "application/json",
+			expectedContentType: "application/json",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			//disable resty redirects
 			req := resty.New().SetRedirectPolicy(resty.NoRedirectPolicy()).R()
+			if tt.contentType != "" {
+				req.SetHeader("Content-Type", tt.contentType)
+			}
+
 			req.Method = tt.method
 			req.Body = tt.body
 			req.URL = srv.URL + tt.path
@@ -90,6 +114,10 @@ func Test_main(t *testing.T) {
 			// проверяем корректность полученного в заголовке редиректа
 			if tt.expectedLocation != "" {
 				assert.Equal(t, tt.expectedLocation, string(resp.Header().Get("Location")))
+			}
+
+			if tt.expectedContentType != "" {
+				assert.Equal(t, tt.expectedContentType, string(resp.Header().Get("Content-Type")))
 			}
 
 			if tt.expectedBody != "" {

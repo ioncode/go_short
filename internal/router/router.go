@@ -12,6 +12,7 @@ import (
 	"github.com/ioncode/go_short/internal/logger"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/service"
+	"github.com/ioncode/go_short/pkg"
 )
 
 func responseHeadersMiddleware(next http.Handler) http.Handler {
@@ -48,7 +49,7 @@ func SetupRouter(config config.Config) http.Handler {
 	repo := repository.NewMapRepository()
 	service := service.NewShortner(repo)
 
-	router := chi.NewRouter()
+	router := chi.NewRouter().With(pkg.GzipMiddleware)
 	router.Get("/{alias}", handler.Get(service))
 	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
 	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.ApiPost(service, config.ShortBaseUrl))

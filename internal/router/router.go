@@ -41,17 +41,18 @@ func requestContentLengthMiddleware(next http.Handler) http.Handler {
 }
 
 func Serve(config config.Config) {
-	router := SetupRouter(config)
+	router, repo := SetupRouter(config)
+	defer repo.Close()
 	log.Fatal(http.ListenAndServe(config.ServerAddress, logger.ResponseLogger(logger.RequestLogger(requestContentLengthMiddleware(responseHeadersMiddleware(router))))))
 }
 
-func SetupRouter(config config.Config) http.Handler {
-	repo := repository.NewMapRepository()
+func SetupRouter(config config.Config) (http.Handler, *repository.MapRepository) {
+	repo := repository.NewMapRepository(config.StoragePath)
 	service := service.NewShortner(repo)
 
 	router := chi.NewRouter().With(pkg.GzipMiddleware)
 	router.Get("/{alias}", handler.Get(service))
 	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
 	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.ApiPost(service, config.ShortBaseUrl))
-	return router
+	return router, repo
 }

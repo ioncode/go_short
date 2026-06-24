@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -18,12 +19,22 @@ import (
 
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
-	srv := httptest.NewServer(router.SetupRouter(config.Config{
+
+	router, repo := router.SetupRouter(config.Config{
 		ServerAddress: ":8080",
 		ShortBaseUrl:  "http://localhost:8080/",
-	}))
-	// останавливаем сервер после завершения теста
-	defer srv.Close()
+		StoragePath:   "test_storage.json",
+	})
+	srv := httptest.NewServer(router)
+
+	t.Cleanup(func() {
+		// останавливаем сервер после завершения теста
+		srv.Close()
+		//закрываем репозиторий
+		repo.Close()
+		//удаляем файл хранения
+		os.Remove("test_storage.json")
+	})
 
 	//save site for reading in tests
 	request := resty.New().R()

@@ -1,6 +1,8 @@
 package repository_test
 
 import (
+	"log"
+	"os"
 	"testing"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -35,7 +37,12 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := repository.NewMapRepository()
+			r := repository.NewMapRepository("test_storage.json")
+			t.Cleanup(func() {
+				log.Println("CleanUp test get by url")
+				r.Close()
+				os.RemoveAll("test_storage.json")
+			})
 			r.StoreSite(tt.want)
 			got, gotError := r.GetByUrl(tt.url)
 			if gotError != nil {
@@ -82,7 +89,12 @@ func TestMapRepository_GetByAlias(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := repository.NewMapRepository()
+			r := repository.NewMapRepository("test_storage.json")
+			t.Cleanup(func() {
+				log.Println("CleanUp test get by alias")
+				r.Close()
+				os.RemoveAll("test_storage.json")
+			})
 			r.StoreSite(tt.want)
 			got, gotErr := r.GetByAlias(tt.alias)
 			if gotErr != nil {
@@ -126,12 +138,19 @@ func TestMapRepository_StoreSite(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			r := repository.NewMapRepository()
+			r := repository.NewMapRepository("test_storage.json")
+			t.Cleanup(func() {
+				log.Println("CleanUp test store site")
+				r.Close()
+				os.RemoveAll("test_storage.json")
+			})
 			r.StoreSite(model.Site{
 				Url:      "yandex.ru",
 				ShortUrl: "sfdsfgd",
 			})
+
 			gotErr := r.StoreSite(tt.site)
 			if gotErr != nil {
 				if !tt.wantErr {

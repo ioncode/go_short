@@ -2,11 +2,13 @@ package repository
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
+	"maps"
 	"os"
+	"slices"
 	"sync"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -25,7 +27,7 @@ type MapRepository struct {
 }
 
 func NewMapRepository(storagePath string) *MapRepository {
-	file, err := os.OpenFile(storagePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	file, err := os.OpenFile(storagePath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalln("Storage path not opened", err, storagePath)
 	}
@@ -35,16 +37,23 @@ func NewMapRepository(storagePath string) *MapRepository {
 		file:  file,
 	}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := bytes.TrimRight(scanner.Bytes(), ", ")
-		site := model.Site{}
-		err := json.Unmarshal(line, &site)
-		if err != nil {
-			log.Fatalln("Error reading site from storage", err, string(line))
-		}
-		repository.sites[site.ShortUrl] = site
+	reader := bufio.NewReader(file)
+	decoder := json.NewDecoder(reader)
+	t, err := decoder.Token()
+	if err != nil && err != io.EOF {
+		log.Fatalf("Failed to read token: %v", err)
 	}
+	if t != nil {
+		for decoder.More() {
+			var site model.Site
+			err := decoder.Decode(&site)
+			if err != nil {
+				log.Fatalf("Failed to decode site : %v", err)
+			}
+			repository.sites[site.ShortUrl] = site
+		}
+	}
+
 	return &repository
 }
 
@@ -65,20 +74,34 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 	if _, ok := r.sites[site.ShortUrl]; ok {
 		return ErrSiteExists
 	}
-	writer := bufio.NewWriter(r.file)
-	jsonData, err := json.Marshal(site)
-	jsonData = append(jsonData, ", \n"...)
+
+	info, err := r.file.Stat()
 	if err != nil {
 		return err
 	}
 
-	if _, err := writer.Write(jsonData); err != nil {
-		return err
+	if info.Size() > 0 {
+		err := r.file.Truncate(0)
+		if err != nil {
+			return err
+		}
+		_, err = r.file.Seek(0, 0)
+		if err != nil {
+			return err
+		}
 	}
 
+	writer := bufio.NewWriter(r.file)
+	r.sites[site.ShortUrl] = site
+	//create slice of sites for storage
+	sites := slices.Collect(maps.Values(r.sites))
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(sites); err != nil {
+		return err
+	}
 	writer.Flush()
 
-	r.sites[site.ShortUrl] = site
 	return nil
 }
 

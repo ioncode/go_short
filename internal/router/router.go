@@ -53,6 +53,6 @@ func SetupRouter(config config.Config) (http.Handler, *repository.MapRepository)
 	router := chi.NewRouter().With(pkg.GzipMiddleware)
 	router.Get("/{alias}", handler.Get(service))
 	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
-	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.ApiPost(service, config.ShortBaseUrl))
+	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl))
 	return router, repo
 }

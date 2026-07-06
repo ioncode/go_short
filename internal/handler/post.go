@@ -49,7 +49,7 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 			writeJSONError(res, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		alias, err := s.Short(requestModel.Url)
+		alias, err := s.Short(requestModel.URL)
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusBadRequest)
 			return

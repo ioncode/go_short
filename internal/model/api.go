@@ -1,7 +1,7 @@
 package model
 
 type PostRequest struct {
-	Url Url `json:"url"`
+	URL Url `json:"url"`
 }
 
 type ErrorResponse struct {

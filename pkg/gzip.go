@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"strings"
 )
@@ -80,7 +81,15 @@ func GzipMiddleware(next http.Handler) http.Handler {
 
 		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
 		acceptEncoding := r.Header.Get("Accept-Encoding")
-		supportsGzip := strings.Contains(acceptEncoding, "gzip")
+		contentType := r.Header.Get("Content-Type")
+		mediaType, _, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			log.Println("Error parsing mediatype from content type", contentType, r.Header)
+			//http.Error(w, "Invalid Content-Type header", http.StatusBadRequest)
+			//return
+		}
+
+		supportsGzip := strings.Contains(acceptEncoding, "gzip") && (mediaType == "application/json" || mediaType == "text/html")
 		if supportsGzip {
 			// оборачиваем оригинальный http.ResponseWriter новым с поддержкой сжатия
 			cw := newCompressWriter(w)

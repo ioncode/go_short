@@ -81,12 +81,13 @@ func Test_main(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name:                    "Store allready stored",
+			name:                    "Store allready stored VIA REST",
 			method:                  http.MethodPost,
-			path:                    "/",
-			body:                    "https://yandex.ru",
+			path:                    "/api/shorten",
+			body:                    `{"url": "Https://yandex.Ru"}`,
+			contentType:             "application/json",
 			expectedCode:            http.StatusCreated,
-			expectedBody:            "http://localhost:8080/" + alias,
+			expectedBody:            "{\"result\":\"http://localhost:8080/" + alias + "\"}\n",
 			expectedContentEncoding: "gzip",
 		},
 		{
@@ -114,12 +115,11 @@ func Test_main(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			//disable resty redirects
 			req := resty.New().SetRedirectPolicy(resty.NoRedirectPolicy()).R().SetDoNotParseResponse(true)
+			req.Method = tt.method
+			req.SetHeader("Content-Encoding", tt.contentEncoding)
 			if tt.contentType != "" {
 				req.SetHeader("Content-Type", tt.contentType)
 			}
-
-			req.Method = tt.method
-			req.SetHeader("Content-Encoding", tt.contentEncoding)
 			if tt.contentEncoding == "gzip" {
 				var buf bytes.Buffer
 				gzipWriter := gzip.NewWriter(&buf)
@@ -169,6 +169,7 @@ func Test_main(t *testing.T) {
 				log.Println("Decommpressed response data", string(unzippedData))
 				assert.Equal(t, tt.expectedBody, string(unzippedData))
 			} else if tt.expectedBody != "" {
+				log.Println("Resp status", resp.StatusCode(), req.Header, resp.RawResponse, resp.Body())
 				assert.Equal(t, tt.expectedBody, string(resp.Body()))
 			}
 		})

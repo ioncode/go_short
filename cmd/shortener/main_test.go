@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-resty/resty/v2"
@@ -15,12 +19,22 @@ import (
 
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
-	srv := httptest.NewServer(router.SetupRouter(config.Config{
+
+	router, repo := router.SetupRouter(config.Config{
 		ServerAddress: ":8080",
 		ShortBaseUrl:  "http://localhost:8080/",
-	}))
-	// останавливаем сервер после завершения теста
-	defer srv.Close()
+		StoragePath:   "test_storage.json",
+	})
+	srv := httptest.NewServer(router)
+
+	t.Cleanup(func() {
+		// останавливаем сервер после завершения теста
+		srv.Close()
+		//закрываем репозиторий
+		repo.Close()
+		//удаляем файл хранения
+		os.Remove("test_storage.json")
+	})
 
 	//save site for reading in tests
 	request := resty.New().R()
@@ -34,13 +48,17 @@ func Test_main(t *testing.T) {
 	log.Println(alias)
 
 	tests := []struct {
-		name             string
-		method           string
-		path             string
-		body             string
-		expectedCode     int
-		expectedLocation string
-		expectedBody     string
+		name                    string
+		method                  string
+		path                    string
+		body                    string
+		expectedCode            int
+		expectedLocation        string
+		expectedBody            string
+		contentType             string
+		expectedContentType     string
+		contentEncoding         string
+		expectedContentEncoding string
 	}{
 		{
 			name:         "Short new site",
@@ -63,24 +81,66 @@ func Test_main(t *testing.T) {
 			expectedCode: http.StatusBadRequest,
 		},
 		{
-			name:         "Store allready stored",
-			method:       http.MethodPost,
-			path:         "/",
-			body:         "https://yandex.ru",
-			expectedCode: http.StatusCreated,
-			expectedBody: "http://localhost:8080/" + alias,
+			name:                    "Store allready stored VIA REST",
+			method:                  http.MethodPost,
+			path:                    "/api/shorten",
+			body:                    `{"url": "Https://yandex.Ru"}`,
+			contentType:             "application/json",
+			expectedCode:            http.StatusCreated,
+			expectedBody:            "{\"result\":\"http://localhost:8080/" + alias + "\"}\n",
+			expectedContentEncoding: "gzip",
+		},
+		{
+			name:                    "Short site via JSON REST API",
+			method:                  http.MethodPost,
+			path:                    "/api/shorten",
+			body:                    `{"url": "Https://practicum.yandex.Ru"}`,
+			expectedCode:            http.StatusCreated,
+			contentType:             "application/json",
+			expectedContentType:     "application/json",
+			contentEncoding:         "gzip",
+			expectedContentEncoding: "gzip",
+		},
+		{
+			name:                "Payload error in JSON REST API",
+			method:              http.MethodPost,
+			path:                "/api/shorten",
+			body:                `{"badkey": "Https://practicum.yandex.Ru"}`,
+			expectedCode:        http.StatusBadRequest,
+			contentType:         "application/json",
+			expectedContentType: "application/json",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			//disable resty redirects
-			req := resty.New().SetRedirectPolicy(resty.NoRedirectPolicy()).R()
+			req := resty.New().SetRedirectPolicy(resty.NoRedirectPolicy()).R().SetDoNotParseResponse(true)
 			req.Method = tt.method
-			req.Body = tt.body
+			req.SetHeader("Content-Encoding", tt.contentEncoding)
+			if tt.contentType != "" {
+				req.SetHeader("Content-Type", tt.contentType)
+			}
+			if tt.contentEncoding == "gzip" {
+				var buf bytes.Buffer
+				gzipWriter := gzip.NewWriter(&buf)
+
+				_, err := gzipWriter.Write([]byte(tt.body))
+				assert.NoError(t, err, "Error comressing request body")
+
+				err = gzipWriter.Close()
+				assert.NoError(t, err, "Error closing gzipWriter")
+				req.Body = &buf
+			} else {
+				req.Body = tt.body
+			}
+			if tt.expectedContentEncoding != "" {
+				req.SetHeader("Accept-Encoding", tt.expectedContentEncoding)
+			}
 			req.URL = srv.URL + tt.path
 			log.Println("Performing resty request to URL", req.URL)
 
 			resp, err := req.Send()
+			defer resp.RawBody().Close()
 			if !errors.Is(err, resty.ErrAutoRedirectDisabled) {
 				assert.NoError(t, err, "error making HTTP request")
 			}
@@ -92,7 +152,24 @@ func Test_main(t *testing.T) {
 				assert.Equal(t, tt.expectedLocation, string(resp.Header().Get("Location")))
 			}
 
-			if tt.expectedBody != "" {
+			if tt.expectedContentType != "" {
+				assert.Equal(t, tt.expectedContentType, string(resp.Header().Get("Content-Type")))
+			}
+
+			if tt.expectedContentEncoding != "" {
+				assert.Equal(t, tt.expectedContentEncoding, string(resp.Header().Get("Content-Encoding")))
+			}
+
+			if tt.expectedContentEncoding == "gzip" && tt.expectedBody != "" {
+				gzipReader, err := gzip.NewReader(resp.RawBody())
+				assert.NoError(t, err, "error reading gzipped response")
+				defer gzipReader.Close()
+				unzippedData, err := io.ReadAll(gzipReader)
+				assert.NoError(t, err, "error reading unGzipped data")
+				log.Println("Decommpressed response data", string(unzippedData))
+				assert.Equal(t, tt.expectedBody, string(unzippedData))
+			} else if tt.expectedBody != "" {
+				log.Println("Resp status", resp.StatusCode(), req.Header, resp.RawResponse, resp.Body())
 				assert.Equal(t, tt.expectedBody, string(resp.Body()))
 			}
 		})

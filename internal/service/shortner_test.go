@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -13,7 +14,11 @@ type MockSiteRepository struct {
 
 func TestMapShortner_Short(t *testing.T) {
 
-	repo := repository.NewMapRepository()
+	repo := repository.NewMapRepository("test_storage.json")
+	t.Cleanup(func() {
+		repo.Close()
+		os.RemoveAll("test_storage.json")
+	})
 	repo.StoreSite(model.Site{
 		Url:      "ya.ru",
 		ShortUrl: "123",
@@ -55,7 +60,11 @@ func TestMapShortner_Short(t *testing.T) {
 }
 
 func TestMapShortner_Get(t *testing.T) {
-	repo := repository.NewMapRepository()
+	repo := repository.NewMapRepository("test_storage.json")
+	t.Cleanup(func() {
+		repo.Close()
+		os.RemoveAll("test_storage.json")
+	})
 	site := model.Site{
 		Url:      "ya.ru",
 		ShortUrl: "123",

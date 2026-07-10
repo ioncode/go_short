@@ -1,9 +1,12 @@
 package router
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -49,6 +52,19 @@ func Serve(config config.Config) {
 func SetupRouter(config config.Config) (http.Handler, *repository.MapRepository) {
 	repo := repository.NewMapRepository(config.StoragePath)
 	service := service.NewShortner(repo)
+
+	db, err := sql.Open("pgx", config.DataBaseDSN)
+	if err != nil {
+		log.Fatalf("Failed to open connection: %v", err)
+	}
+	defer db.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	sitesRepo := repository.NewPostgresSitesRepository(db)
+
+	log.Println(sitesRepo.Ping(ctx))
 
 	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware)
 	router.Get("/{alias}", handler.Get(service))

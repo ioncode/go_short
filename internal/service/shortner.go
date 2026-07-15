@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"log"
 	"math/rand/v2"
 	"sync"
@@ -25,6 +26,8 @@ type SiteRepository interface {
 	GetByAlias(alias model.ShortUrl) (model.Site, error)
 	StoreSite(site model.Site) error
 	GetByUrl(url model.Url) (model.Site, error)
+	Ping(ctx context.Context) error
+	Close() error
 }
 
 // service struct

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -121,4 +122,8 @@ func (r *MapRepository) GetByUrl(url model.Url) (model.Site, error) {
 
 func (r *MapRepository) Close() error {
 	return r.file.Close()
+}
+
+func (r *MapRepository) Ping(context.Context) error {
+	return errors.New("Ping not supported for Map repository")
 }

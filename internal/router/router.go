@@ -47,22 +47,23 @@ func Serve(config config.Config) {
 	log.Fatal(http.ListenAndServe(config.ServerAddress, logger.ResponseLogger(logger.RequestLogger(router))))
 }
 
-func SetupRouter(config config.Config) (http.Handler, *repository.MapRepository) {
-	repo := repository.NewMapRepository(config.StoragePath)
-	service := service.NewShortner(repo)
-
-	db, err := sql.Open("pgx", config.DataBaseDSN)
-	if err != nil {
-		log.Fatalf("Failed to open connection: %v", err)
+func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
+	var repo service.SiteRepository
+	if config.DataBaseDSN == "" {
+		repo = repository.NewMapRepository(config.StoragePath)
+	} else {
+		db, err := sql.Open("pgx", config.DataBaseDSN)
+		if err != nil {
+			log.Fatalf("Failed to open connection: %v", err)
+		}
+		repo = repository.NewPostgresSitesRepository(db)
 	}
-	//todo move db to main, rewrite tests
-	//defer db.Close()
 
-	sitesRepo := repository.NewPostgresSitesRepository(db)
+	service := service.NewShortner(repo)
 
 	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware)
 	router.Get("/{alias}", handler.Get(service))
-	router.Get("/ping", handler.Ping(sitesRepo))
+	router.Get("/ping", handler.Ping(repo))
 	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
 	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl))
 	return router, repo

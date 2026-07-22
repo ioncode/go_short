@@ -11,3 +11,13 @@ type ErrorResponse struct {
 type PostResponse struct {
 	Result string `json:"result"`
 }
+
+type BatchPostRequestItem struct {
+	URL           Url    `json:"original_url"`
+	CorrelationId string `json:"correlation_id"`
+}
+
+type BatchPostResponseItem struct {
+	Alias         ShortUrl `json:"short_url"`
+	CorrelationId string   `json:"correlation_id"`
+}

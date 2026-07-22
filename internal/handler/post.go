@@ -12,6 +12,7 @@ import (
 
 type ShortService interface {
 	Short(url model.Url) (model.ShortUrl, error)
+	BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error)
 }
 
 func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
@@ -65,6 +66,54 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 		}
 		res.WriteHeader(http.StatusCreated)
 		json.NewEncoder(res).Encode(result)
+	}
+}
+
+func APIPostBatch(s ShortService, shortBaseURL string) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		log.Println("Started Batch Api Post handler")
+		var items []model.BatchPostRequestItem
+		decoder := json.NewDecoder(req.Body)
+		decoder.DisallowUnknownFields()
+
+		if err := decoder.Decode(&items); err != nil {
+			writeJSONError(res, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if len(items) < 1 {
+			writeJSONError(res, "No items in request", http.StatusBadRequest)
+			return
+		}
+
+		validItems := items[:0]
+
+		for _, item := range items {
+			if item.CorrelationId != "" && item.URL != "" {
+				validItems = append(validItems, item)
+			}
+			log.Println(item)
+		}
+		if len(validItems) < 1 {
+			writeJSONError(res, "No valid items in request", http.StatusBadRequest)
+			return
+		}
+		response, err := s.BatchShort(validItems)
+		if err != nil {
+			writeJSONError(res, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		for i, responseItem := range response {
+			url, err := url.JoinPath(shortBaseURL, string(responseItem.Alias))
+			if err != nil {
+				writeJSONError(res, err.Error(), http.StatusBadRequest)
+				return
+			}
+			response[i].Alias = model.ShortUrl(url)
+		}
+		res.WriteHeader(http.StatusCreated)
+		json.NewEncoder(res).Encode(response)
 	}
 }
 

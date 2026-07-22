@@ -72,3 +72,34 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 
 	return site.ShortUrl, err
 }
+
+func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	return []model.BatchPostResponseItem{
+		{Alias: "dfdffdg", CorrelationId: "123"},
+		{Alias: "asas", CorrelationId: "345"},
+	}, nil
+
+	// site, err := s.repository.GetByUrl(url)
+
+	// if err == nil {
+	// 	return site.ShortUrl, nil
+	// }
+
+	// alias := model.ShortUrl(stringWithCharset(8))
+	// _, err = s.repository.GetByAlias(alias)
+	// for err == nil {
+	// 	log.Println("This alias allready taken, generating new one", alias)
+	// 	alias = model.ShortUrl(stringWithCharset(8))
+	// 	_, err = s.repository.GetByAlias(alias)
+	// }
+	// site = model.Site{
+	// 	Url:      url,
+	// 	ShortUrl: alias,
+	// }
+	// err = s.repository.StoreSite(site)
+
+	// return site.ShortUrl, err
+}

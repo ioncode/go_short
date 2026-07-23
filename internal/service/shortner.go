@@ -28,6 +28,7 @@ type SiteRepository interface {
 	GetByUrl(url model.Url) (model.Site, error)
 	Ping(ctx context.Context) error
 	Close() error
+	BatchStoreSites(sites []model.Site) error
 }
 
 // service struct
@@ -77,29 +78,29 @@ func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.Batch
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return []model.BatchPostResponseItem{
-		{Alias: "dfdffdg", CorrelationId: "123"},
-		{Alias: "asas", CorrelationId: "345"},
-	}, nil
+	var responseItems []model.BatchPostResponseItem
 
-	// site, err := s.repository.GetByUrl(url)
+	var newSites []model.Site
 
-	// if err == nil {
-	// 	return site.ShortUrl, nil
-	// }
+	for _, item := range items {
+		site, err := s.repository.GetByUrl(item.URL)
 
-	// alias := model.ShortUrl(stringWithCharset(8))
-	// _, err = s.repository.GetByAlias(alias)
-	// for err == nil {
-	// 	log.Println("This alias allready taken, generating new one", alias)
-	// 	alias = model.ShortUrl(stringWithCharset(8))
-	// 	_, err = s.repository.GetByAlias(alias)
-	// }
-	// site = model.Site{
-	// 	Url:      url,
-	// 	ShortUrl: alias,
-	// }
-	// err = s.repository.StoreSite(site)
+		if err == nil {
+			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: site.ShortUrl})
+		} else {
+			alias := model.ShortUrl(stringWithCharset(8))
+			_, err = s.repository.GetByAlias(alias)
+			for err == nil {
+				log.Println("This alias allready taken, generating new one", alias)
+				alias = model.ShortUrl(stringWithCharset(8))
+				_, err = s.repository.GetByAlias(alias)
+			}
 
-	// return site.ShortUrl, err
+			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: alias})
+			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias})
+		}
+	}
+
+	err := s.repository.BatchStoreSites(newSites)
+	return responseItems, err
 }

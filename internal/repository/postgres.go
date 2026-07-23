@@ -3,9 +3,12 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -70,6 +73,40 @@ func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
 	}
 
 	return nil
+}
+
+func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	connection, err := r.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+	rows := [][]any{}
+
+	for _, site := range sites {
+		rows = append(rows, []any{site.Url, site.ShortUrl, site.CorrelationId})
+	}
+
+	err = connection.Raw(func(driverConn any) error {
+		stdlibConn, ok := driverConn.(*stdlib.Conn)
+		if !ok {
+			return errors.New("driver connection is not a pgx stdlib connection")
+		}
+
+		pgxConn := stdlibConn.Conn()
+		_, err = pgxConn.CopyFrom(
+			ctx,
+			pgx.Identifier{"sites"},
+			[]string{"url", "short_url", "correlation_id"},
+			pgx.CopyFromRows(rows),
+		)
+		return err
+	})
+
+	return err
 }
 
 func (r *PostgresSitesRepository) Close() error {

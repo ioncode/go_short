@@ -110,6 +110,36 @@ func Test_main(t *testing.T) {
 			contentType:         "application/json",
 			expectedContentType: "application/json",
 		},
+		{
+			name:                    "Batch Store allready stored",
+			method:                  http.MethodPost,
+			path:                    "/api/shorten/batch",
+			body:                    `[{"original_url": "Https://yandex.Ru","correlation_id": "uuid1"}, {"original_url": "Https://yandex.Ru","correlation_id": "uuid2"}]`,
+			contentType:             "application/json",
+			expectedCode:            http.StatusCreated,
+			expectedBody:            "[{\"short_url\":\"http://localhost:8080/" + alias + "\",\"correlation_id\":\"uuid1\"},{\"short_url\":\"http://localhost:8080/" + alias + "\",\"correlation_id\":\"uuid2\"}]\n",
+			expectedContentEncoding: "gzip",
+		},
+		{
+			name:                    "Empty Batch Store",
+			method:                  http.MethodPost,
+			path:                    "/api/shorten/batch",
+			body:                    `[]`,
+			contentType:             "application/json",
+			expectedCode:            http.StatusBadRequest,
+			expectedBody:            "{\"error\":\"No items in request\"}\n",
+			expectedContentEncoding: "gzip",
+		},
+		{
+			name:                    "Invalid Batch Store",
+			method:                  http.MethodPost,
+			path:                    "/api/shorten/batch",
+			body:                    `[{"original_url": "Https://yandex.Ru"}, {"correlation_id": "uuid2"}]`,
+			contentType:             "application/json",
+			expectedCode:            http.StatusBadRequest,
+			expectedBody:            "{\"error\":\"No valid items in request\"}\n",
+			expectedContentEncoding: "gzip",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

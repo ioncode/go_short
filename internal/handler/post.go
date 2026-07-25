@@ -12,6 +12,9 @@ import (
 
 type ShortService interface {
 	Short(url model.Url) (model.ShortUrl, error)
+}
+
+type BatchShortService interface {
 	BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error)
 }
 
@@ -69,7 +72,7 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 	}
 }
 
-func APIPostBatch(s ShortService, shortBaseURL string) http.HandlerFunc {
+func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		log.Println("Started Batch Api Post handler")
 		var items []model.BatchPostRequestItem
@@ -92,7 +95,6 @@ func APIPostBatch(s ShortService, shortBaseURL string) http.HandlerFunc {
 			if item.CorrelationId != "" && item.URL != "" {
 				validItems = append(validItems, item)
 			}
-			log.Println(item)
 		}
 		if len(validItems) < 1 {
 			writeJSONError(res, "No valid items in request", http.StatusBadRequest)

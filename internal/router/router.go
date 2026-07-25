@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/ioncode/go_short/internal/config"
+	"github.com/ioncode/go_short/internal/config/db"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/logger"
 	"github.com/ioncode/go_short/internal/repository"
@@ -55,19 +55,10 @@ func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
 	if config.DataBaseDSN == "" {
 		repo = repository.NewMapRepository(config.StoragePath)
 	} else {
+		db.RunPostgressMigrations(config.DataBaseDSN)
 		db, err := sql.Open("pgx", config.DataBaseDSN)
 		if err != nil {
 			log.Fatalf("Failed to open connection: %v", err)
-		}
-
-		m, err := migrate.New(
-			"file://../../migrations",
-			config.DataBaseDSN)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-			log.Fatal(err)
 		}
 		repo = repository.NewPostgresSitesRepository(db)
 	}

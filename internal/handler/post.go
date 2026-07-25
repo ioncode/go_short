@@ -2,12 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/ioncode/go_short/internal/repository"
 )
 
 type ShortService interface {
@@ -27,11 +29,16 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 			return
 		}
 		alias, err := s.Short(model.Url(body))
+		respStatus := http.StatusCreated
 		if err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
-			return
+			if errors.Is(err, repository.ErrSiteExists) {
+				respStatus = http.StatusConflict
+			} else {
+				http.Error(res, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
-		res.WriteHeader(http.StatusCreated)
+		res.WriteHeader(respStatus)
 		url, err := url.JoinPath(shortBaseURL, string(alias))
 		if err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
@@ -53,9 +60,14 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 			return
 		}
 		alias, err := s.Short(requestModel.URL)
+		respStatus := http.StatusCreated
 		if err != nil {
-			writeJSONError(res, err.Error(), http.StatusBadRequest)
-			return
+			if errors.Is(err, repository.ErrSiteExists) {
+				respStatus = http.StatusConflict
+			} else {
+				writeJSONError(res, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 
 		url, err := url.JoinPath(shortBaseURL, string(alias))
@@ -67,7 +79,7 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 		result := model.PostResponse{
 			Result: url,
 		}
-		res.WriteHeader(http.StatusCreated)
+		res.WriteHeader(respStatus)
 		json.NewEncoder(res).Encode(result)
 	}
 }

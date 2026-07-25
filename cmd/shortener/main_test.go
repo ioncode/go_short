@@ -86,7 +86,7 @@ func Test_main(t *testing.T) {
 			path:                    "/api/shorten",
 			body:                    `{"url": "Https://yandex.Ru"}`,
 			contentType:             "application/json",
-			expectedCode:            http.StatusCreated,
+			expectedCode:            http.StatusConflict,
 			expectedBody:            "{\"result\":\"http://localhost:8080/" + alias + "\"}\n",
 			expectedContentEncoding: "gzip",
 		},

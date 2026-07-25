@@ -76,6 +76,12 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 		return ErrSiteExists
 	}
 
+	for _, storedSite := range r.sites {
+		if site.Url == storedSite.Url {
+			return ErrSiteExists
+		}
+	}
+
 	info, err := r.file.Stat()
 	if err != nil {
 		return err

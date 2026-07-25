@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -69,6 +71,12 @@ func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
 	defer cancel()
 	_, err := r.db.ExecContext(ctx, "INSERT INTO SITES (url, short_url) VALUES ($1, $2)", site.Url, site.ShortUrl)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == pgerrcode.UniqueViolation {
+				return ErrSiteExists
+			}
+		}
 		return err
 	}
 

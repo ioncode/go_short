@@ -17,7 +17,7 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.ServerAddress, "a", ":8080", "адрес запуска HTTP-сервера")
 	flag.StringVar(&cfg.ShortBaseUrl, "b", "http://localhost:8080/", " базовый адрес результирующего сокращённого URL")
 	flag.StringVar(&cfg.StoragePath, "f", "storage.json", "путь к файлу для сохранения сайтов")
-	flag.StringVar(&cfg.DataBaseDSN, "d", "postgres://myuser:mysecretpassword@localhost:5432/mydatabase?sslmode=disable", "параметры подключения к БД")
+	flag.StringVar(&cfg.DataBaseDSN, "d", "", "параметры подключения к БД")
 	flag.Parse()
 
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
@@ -33,12 +33,6 @@ func ParseFlags() Config {
 	}
 
 	if envDataBaseDSN := os.Getenv("DATABASE_DSN"); envDataBaseDSN != "" {
-		cfg.DataBaseDSN = envDataBaseDSN
-	}
-
-	//todo fix env name issue on github and remove this
-
-	if envDataBaseDSN := os.Getenv("DATABASE_CONN_STRING"); envDataBaseDSN != "" {
 		cfg.DataBaseDSN = envDataBaseDSN
 	}
 

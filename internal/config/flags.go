@@ -36,5 +36,11 @@ func ParseFlags() Config {
 		cfg.DataBaseDSN = envDataBaseDSN
 	}
 
+	//todo fix env name issue on github and remove this
+
+	if envDataBaseDSN := os.Getenv("DATABASE_CONN_STRING"); envDataBaseDSN != "" {
+		cfg.DataBaseDSN = envDataBaseDSN
+	}
+
 	return cfg
 }

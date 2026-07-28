@@ -101,7 +101,7 @@ func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 			return
 		}
 
-		validItems := items[:0]
+		var validItems []model.BatchPostRequestItem
 
 		for _, item := range items {
 			if item.CorrelationId != "" && item.URL != "" {

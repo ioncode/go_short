@@ -55,12 +55,15 @@ func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
 	if config.DataBaseDSN == "" {
 		repo = repository.NewMapRepository(config.StoragePath)
 	} else {
-		db.RunPostgressMigrations(config.DataBaseDSN)
-		db, err := sql.Open("pgx", config.DataBaseDSN)
+		err := db.RunPostgressMigrations(config.DataBaseDSN)
+		if err != nil {
+			log.Fatalf("Failed to run migrations: %v", err)
+		}
+		sqlDB, err := sql.Open("pgx", config.DataBaseDSN)
 		if err != nil {
 			log.Fatalf("Failed to open connection: %v", err)
 		}
-		repo = repository.NewPostgresSitesRepository(db)
+		repo = repository.NewPostgresSitesRepository(sqlDB)
 	}
 
 	service := service.NewShortner(repo)

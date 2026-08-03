@@ -10,6 +10,7 @@ import (
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/gorilla/securecookie"
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/config/db"
 	"github.com/ioncode/go_short/internal/handler"
@@ -66,9 +67,16 @@ func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
 		repo = repository.NewPostgresSitesRepository(sqlDB)
 	}
 
+	// not persisted random key for userAuthMiddleware
+	hashKey := securecookie.GenerateRandomKey(64)
+
+	sc := securecookie.New(hashKey, nil)
+
+	authMiddleware := pkg.NewAuthMiddleware(sc)
+
 	service := service.NewShortner(repo)
 
-	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware)
+	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware, authMiddleware.EnsureUserHasID)
 	router.Get("/{alias}", handler.Get(service))
 	router.Get("/ping", handler.Ping(repo))
 	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))

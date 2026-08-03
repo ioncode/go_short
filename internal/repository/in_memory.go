@@ -2,6 +2,7 @@ package repository
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -75,6 +76,12 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 		return ErrSiteExists
 	}
 
+	for _, storedSite := range r.sites {
+		if site.Url == storedSite.Url {
+			return ErrSiteExists
+		}
+	}
+
 	info, err := r.file.Stat()
 	if err != nil {
 		return err
@@ -105,6 +112,42 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 	return nil
 }
 
+func (r *MapRepository) BatchStoreSites(sites []model.Site) error {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	for _, site := range sites {
+		r.sites[site.ShortUrl] = site
+	}
+
+	info, err := r.file.Stat()
+	if err != nil {
+		return err
+	}
+
+	if info.Size() > 0 {
+		err := r.file.Truncate(0)
+		if err != nil {
+			return err
+		}
+		_, err = r.file.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	writer := bufio.NewWriter(r.file)
+	//create slice of sites for storage
+	allSites := slices.Collect(maps.Values(r.sites))
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(allSites); err != nil {
+		return err
+	}
+	writer.Flush()
+
+	return nil
+}
+
 func (r *MapRepository) GetByUrl(url model.Url) (model.Site, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -121,4 +164,8 @@ func (r *MapRepository) GetByUrl(url model.Url) (model.Site, error) {
 
 func (r *MapRepository) Close() error {
 	return r.file.Close()
+}
+
+func (r *MapRepository) Ping(context.Context) error {
+	return errors.New("Ping not supported for Map repository")
 }

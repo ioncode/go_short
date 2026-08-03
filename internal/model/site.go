@@ -23,6 +23,7 @@ func (u *Url) UnmarshalJSON(data []byte) error {
 
 // site
 type Site struct {
-	Url      Url
-	ShortUrl ShortUrl
+	Url           Url
+	ShortUrl      ShortUrl
+	CorrelationId string
 }

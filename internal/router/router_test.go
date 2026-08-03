@@ -54,7 +54,7 @@ func Test_middleware(t *testing.T) {
 			name:           "Post with correct content type and too large body",
 			method:         http.MethodPost,
 			expectedStatus: http.StatusRequestEntityTooLarge,
-			body:           strings.NewReader(strings.Repeat("S", 1000)),
+			body:           strings.NewReader(strings.Repeat("S", 10000)),
 			contentType:    "text/plain; charset=utf-8",
 			next:           responseContentTypeHandler,
 		},

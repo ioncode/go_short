@@ -9,6 +9,7 @@ type Config struct {
 	ServerAddress string
 	ShortBaseUrl  string
 	StoragePath   string
+	DataBaseDSN   string
 }
 
 func ParseFlags() Config {
@@ -16,6 +17,7 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.ServerAddress, "a", ":8080", "адрес запуска HTTP-сервера")
 	flag.StringVar(&cfg.ShortBaseUrl, "b", "http://localhost:8080/", " базовый адрес результирующего сокращённого URL")
 	flag.StringVar(&cfg.StoragePath, "f", "storage.json", "путь к файлу для сохранения сайтов")
+	flag.StringVar(&cfg.DataBaseDSN, "d", "", "параметры подключения к БД")
 	flag.Parse()
 
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
@@ -28,6 +30,10 @@ func ParseFlags() Config {
 
 	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
 		cfg.StoragePath = envStoragePath
+	}
+
+	if envDataBaseDSN := os.Getenv("DATABASE_DSN"); envDataBaseDSN != "" {
+		cfg.DataBaseDSN = envDataBaseDSN
 	}
 
 	return cfg

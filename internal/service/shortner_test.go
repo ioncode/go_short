@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"errors"
 	"os"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestMapShortner_Short(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := service.NewShortner(tt.r)
 			got, gotErr := s.Short(tt.Url)
-			if gotErr != nil {
+			if gotErr != nil && !errors.Is(gotErr, repository.ErrSiteExists) {
 				if !tt.wantErr {
 					t.Errorf("Short() failed: %v", gotErr)
 				}

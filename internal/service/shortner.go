@@ -1,11 +1,14 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"log"
 	"math/rand/v2"
 	"sync"
 
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/ioncode/go_short/internal/repository"
 )
 
 // fast random string generator
@@ -25,6 +28,9 @@ type SiteRepository interface {
 	GetByAlias(alias model.ShortUrl) (model.Site, error)
 	StoreSite(site model.Site) error
 	GetByUrl(url model.Url) (model.Site, error)
+	Ping(ctx context.Context) error
+	Close() error
+	BatchStoreSites(sites []model.Site) error
 }
 
 // service struct
@@ -48,24 +54,57 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	site, err := s.repository.GetByUrl(url)
-
-	if err == nil {
-		return site.ShortUrl, nil
-	}
-
 	alias := model.ShortUrl(stringWithCharset(8))
-	_, err = s.repository.GetByAlias(alias)
+	_, err := s.repository.GetByAlias(alias)
 	for err == nil {
 		log.Println("This alias allready taken, generating new one", alias)
 		alias = model.ShortUrl(stringWithCharset(8))
 		_, err = s.repository.GetByAlias(alias)
 	}
-	site = model.Site{
+	site := model.Site{
 		Url:      url,
 		ShortUrl: alias,
 	}
 	err = s.repository.StoreSite(site)
 
+	if errors.Is(err, repository.ErrSiteExists) {
+		postErr := err
+		site, err = s.repository.GetByUrl(url)
+		if err == nil {
+			err = postErr
+		}
+	}
+
 	return site.ShortUrl, err
+}
+
+func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var responseItems []model.BatchPostResponseItem
+
+	var newSites []model.Site
+
+	for _, item := range items {
+		site, err := s.repository.GetByUrl(item.URL)
+
+		if err == nil {
+			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: site.ShortUrl})
+		} else {
+			alias := model.ShortUrl(stringWithCharset(8))
+			_, err = s.repository.GetByAlias(alias)
+			for err == nil {
+				log.Println("This alias allready taken, generating new one", alias)
+				alias = model.ShortUrl(stringWithCharset(8))
+				_, err = s.repository.GetByAlias(alias)
+			}
+
+			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: alias})
+			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias})
+		}
+	}
+
+	err := s.repository.BatchStoreSites(newSites)
+	return responseItems, err
 }

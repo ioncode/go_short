@@ -26,4 +26,5 @@ type Site struct {
 	Url           Url
 	ShortUrl      ShortUrl
 	CorrelationId string
+	UserId        string
 }

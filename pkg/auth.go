@@ -31,7 +31,12 @@ func (am *AuthMiddleware) EnsureUserHasID(next http.Handler) http.Handler {
 		// 1. Пытаемся прочитать существующую куку
 		cookie, err := r.Cookie(cookieName)
 
-		if err == nil && cookie.Value != "" {
+		if err == nil {
+			//Если кука присутствует в запросе, но не содержит ID пользователя
+			if cookie.Value == "" {
+				http.Error(w, "Кука не содержит ID пользователя", http.StatusUnauthorized)
+				return
+			}
 			// 2. Декодируем и ПРОВЕРЯЕМ симметричную подпись
 			// Если злоумышленник изменил userID в браузере, Decode вернет ошибку
 			err = am.sc.Decode(cookieName, cookie.Value, &userID)
@@ -69,8 +74,8 @@ func (am *AuthMiddleware) EnsureUserHasID(next http.Handler) http.Handler {
 			http.SetCookie(w, newCookie)
 		}
 
-		// 4. Передаем чистый, проверенный userID в контекст запроса
-		claims := &model.User{
+		// 4. Передаем пользователя в контекст запроса
+		claims := model.User{
 			ID: userID,
 		}
 

@@ -169,3 +169,16 @@ func (r *MapRepository) Close() error {
 func (r *MapRepository) Ping(context.Context) error {
 	return errors.New("Ping not supported for Map repository")
 }
+
+func (r *MapRepository) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+	result := []model.UserSitesResponseItem{}
+	for _, site := range r.sites {
+		if site.UserId == userId {
+			result = append(result, model.UserSitesResponseItem{
+				Alias: site.ShortUrl,
+				URL:   site.Url,
+			})
+		}
+	}
+	return result, nil
+}

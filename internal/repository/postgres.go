@@ -66,6 +66,37 @@ func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
 	return site, nil
 }
 
+func (r *PostgresSitesRepository) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	records := []model.UserSitesResponseItem{}
+
+	query := `SELECT url, short_url FROM sites WHERE user_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, userId)
+	if err != nil {
+		return records, err
+	}
+	defer rows.Close()
+
+	// Читаем строки из БД
+	for rows.Next() {
+		var rec model.UserSitesResponseItem
+		err := rows.Scan(&rec.URL, &rec.Alias)
+		if err != nil {
+			return records, err
+		}
+		records = append(records, rec)
+	}
+
+	// Проверяем, не возникло ли ошибок при итерации
+	if err = rows.Err(); err != nil {
+		return records, err
+	}
+
+	return records, nil
+}
+
 func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

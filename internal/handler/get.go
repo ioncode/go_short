@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -24,5 +25,32 @@ func Get(s GetService) http.HandlerFunc {
 			return
 		}
 		http.Redirect(res, req, string(site.Url), http.StatusTemporaryRedirect)
+	}
+}
+
+type GetByUser interface {
+	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
+}
+
+func GetUserSites(s GetByUser) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		user, ok := req.Context().Value(model.UserContextKey).(model.User)
+		if !ok {
+			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
+			return
+		}
+		log.Println("Started user get request handler " + user.ID)
+
+		records, err := s.GetByUser(user.ID)
+		if err != nil {
+			writeJSONError(res, err.Error(), http.StatusInternalServerError)
+		}
+
+		if len(records) == 0 {
+			res.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		json.NewEncoder(res).Encode(records)
 	}
 }

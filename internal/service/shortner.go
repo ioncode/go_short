@@ -31,6 +31,7 @@ type SiteRepository interface {
 	Ping(ctx context.Context) error
 	Close() error
 	BatchStoreSites(sites []model.Site) error
+	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
 }
 
 // service struct
@@ -78,7 +79,7 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 	return site.ShortUrl, err
 }
 
-func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error) {
+func (s *Shortner) BatchShort(items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -101,10 +102,14 @@ func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.Batch
 			}
 
 			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: alias})
-			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias})
+			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias, UserId: user.ID})
 		}
 	}
 
 	err := s.repository.BatchStoreSites(newSites)
 	return responseItems, err
+}
+
+func (s *Shortner) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+	return s.repository.GetByUser(userId)
 }

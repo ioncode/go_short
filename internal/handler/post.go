@@ -17,7 +17,7 @@ type ShortService interface {
 }
 
 type BatchShortService interface {
-	BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error)
+	BatchShort(items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error)
 }
 
 func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
@@ -112,7 +112,12 @@ func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 			writeJSONError(res, "No valid items in request", http.StatusBadRequest)
 			return
 		}
-		response, err := s.BatchShort(validItems)
+		user, ok := req.Context().Value(model.UserContextKey).(model.User)
+		if !ok {
+			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
+			return
+		}
+		response, err := s.BatchShort(validItems, user)
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusBadRequest)
 			return

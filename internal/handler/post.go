@@ -13,7 +13,7 @@ import (
 )
 
 type ShortService interface {
-	Short(url model.Url) (model.ShortUrl, error)
+	Short(url model.Url, user model.User) (model.ShortUrl, error)
 }
 
 type BatchShortService interface {
@@ -28,7 +28,12 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
-		alias, err := s.Short(model.Url(body))
+		user, ok := req.Context().Value(model.UserContextKey).(model.User)
+		if !ok {
+			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
+			return
+		}
+		alias, err := s.Short(model.Url(body), user)
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -59,7 +64,12 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 			writeJSONError(res, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		alias, err := s.Short(requestModel.URL)
+		user, ok := req.Context().Value(model.UserContextKey).(model.User)
+		if !ok {
+			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
+			return
+		}
+		alias, err := s.Short(requestModel.URL, user)
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {

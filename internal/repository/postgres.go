@@ -100,7 +100,7 @@ func (r *PostgresSitesRepository) GetByUser(userId string) ([]model.UserSitesRes
 func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err := r.db.ExecContext(ctx, "INSERT INTO SITES (url, short_url) VALUES ($1, $2)", site.Url, site.ShortUrl)
+	_, err := r.db.ExecContext(ctx, "INSERT INTO SITES (url, short_url, user_id) VALUES ($1, $2, $3)", site.Url, site.ShortUrl, site.UserId)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -126,7 +126,7 @@ func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
 	rows := [][]any{}
 
 	for _, site := range sites {
-		rows = append(rows, []any{site.Url, site.ShortUrl, site.CorrelationId})
+		rows = append(rows, []any{site.Url, site.ShortUrl, site.CorrelationId, site.UserId})
 	}
 
 	err = connection.Raw(func(driverConn any) error {
@@ -139,7 +139,7 @@ func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
 		_, err = pgxConn.CopyFrom(
 			ctx,
 			pgx.Identifier{"sites"},
-			[]string{"url", "short_url", "correlation_id"},
+			[]string{"url", "short_url", "correlation_id", "user_id"},
 			pgx.CopyFromRows(rows),
 		)
 		return err

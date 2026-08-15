@@ -51,7 +51,7 @@ func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
 	return s.repository.GetByAlias(alias)
 }
 
-func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
+func (s *Shortner) Short(url model.Url, user model.User) (model.ShortUrl, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -65,6 +65,7 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 	site := model.Site{
 		Url:      url,
 		ShortUrl: alias,
+		UserId:   user.ID,
 	}
 	err = s.repository.StoreSite(site)
 

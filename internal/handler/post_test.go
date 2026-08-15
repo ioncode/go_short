@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -17,7 +18,7 @@ type MockService struct {
 	MockShort func(url string) (string, error)
 }
 
-func (m *MockService) Short(url model.Url) (model.ShortUrl, error) {
+func (m *MockService) Short(url model.Url, user model.User) (model.ShortUrl, error) {
 	alias, error := m.MockShort(string(url))
 	return model.ShortUrl(alias), error
 }
@@ -53,7 +54,8 @@ func TestPost(t *testing.T) {
 				MockShort: tt.mockBehavior,
 			}
 			handler := handler.Post(service, "http://localhost:8080/")
-			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ya.ru"))
+			ctx := context.WithValue(context.Background(), model.UserContextKey, model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
+			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 			res := w.Result()

@@ -24,6 +24,12 @@ func Get(s GetService) http.HandlerFunc {
 			http.Error(res, string(alias)+": "+err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		if site.DeletedFlag {
+			res.WriteHeader(http.StatusGone)
+			return
+		}
+
 		http.Redirect(res, req, string(site.Url), http.StatusTemporaryRedirect)
 	}
 }

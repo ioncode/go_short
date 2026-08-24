@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 )
 
 type PostgresSitesRepository struct {
@@ -30,11 +31,11 @@ func (r *PostgresSitesRepository) GetByAlias(alias model.ShortUrl) (model.Site, 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	row := r.db.QueryRowContext(ctx,
-		"SELECT url "+
+		"SELECT url, is_deleted "+
 			"FROM sites WHERE short_url = $1 LIMIT 1", alias)
 
 	var site model.Site
-	err := row.Scan(&site.Url)
+	err := row.Scan(&site.Url, &site.DeletedFlag)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return site, ErrSiteNotFound
@@ -150,4 +151,15 @@ func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
 
 func (r *PostgresSitesRepository) Close() error {
 	return r.db.Close()
+}
+
+func (r *PostgresSitesRepository) Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error {
+	query := `
+		UPDATE sites SET is_deleted = true 
+		WHERE user_id = $1 
+		AND short_url = ANY($2) 
+		AND is_deleted = false;`
+
+	_, err := r.db.ExecContext(ctx, query, user.ID, pq.Array(aliases))
+	return err
 }

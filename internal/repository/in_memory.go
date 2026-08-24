@@ -182,3 +182,25 @@ func (r *MapRepository) GetByUser(userId string) ([]model.UserSitesResponseItem,
 	}
 	return result, nil
 }
+
+func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	for _, alias := range aliases {
+		if err := ctx.Err(); err != nil {
+		return err
+	}
+		item, exists := r.sites[alias]
+		if exists && item.UserId == user.ID && !item.DeletedFlag {
+				item.DeletedFlag = true
+				r.sites[alias] = item
+			}
+	}
+
+	return nil
+}

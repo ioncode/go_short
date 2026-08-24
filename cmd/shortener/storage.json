@@ -1,6 +1,72 @@
 [
   {
+    "Url": "1234",
+    "ShortUrl": "2t9tD6PS",
+    "CorrelationId": "1234",
+    "UserId": "f66fd1e8-4a15-43c3-b85d-4e2ee6f60ca8",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "12345",
+    "ShortUrl": "T6sIlZEm",
+    "CorrelationId": "12345",
+    "UserId": "376a2e03-d731-425a-9a93-aa05e5148324",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "1343https://yandex1223",
+    "ShortUrl": "zvkUICoE",
+    "CorrelationId": "13434\u003cстроковый идентификатор12\u003e",
+    "UserId": "f66fd1e8-4a15-43c3-b85d-4e2ee6f60ca8",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "13434https://yandex1243",
+    "ShortUrl": "RXJy9QGX",
+    "CorrelationId": "13434\u003cстроковый идентификатор14\u003e",
+    "UserId": "f66fd1e8-4a15-43c3-b85d-4e2ee6f60ca8",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "13434\u003curl для сокращения1234566\u003e",
+    "ShortUrl": "bxTyKS5H",
+    "CorrelationId": "13434\u003cстроковый идентификатор2444\u003e",
+    "UserId": "f66fd1e8-4a15-43c3-b85d-4e2ee6f60ca8",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "12345678",
+    "ShortUrl": "dSgevf5G",
+    "CorrelationId": "12345678",
+    "UserId": "a99ad5b9-ca2d-4f76-a42d-0937f6a26acf",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "134https://yandex1233444",
+    "ShortUrl": "0gVBFjIh",
+    "CorrelationId": "13434\u003cстроковый идентификатор134444\u003e",
+    "UserId": "f66fd1e8-4a15-43c3-b85d-4e2ee6f60ca8",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "123456",
+    "ShortUrl": "9rDKuesy",
+    "CorrelationId": "123456",
+    "UserId": "97ef9bea-9aac-4c86-a379-c15a871fb58e",
+    "DeletedFlag": false
+  },
+  {
+    "Url": "1234567",
+    "ShortUrl": "jBMOh50d",
+    "CorrelationId": "1234567",
+    "UserId": "a99ad5b9-ca2d-4f76-a42d-0937f6a26acf",
+    "DeletedFlag": true
+  },
+  {
     "Url": "https://yandex.ru7",
-    "ShortUrl": "aJfkqq0d"
+    "ShortUrl": "aJfkqq0d",
+    "CorrelationId": "",
+    "UserId": "",
+    "DeletedFlag": false
   }
 ]

@@ -83,5 +83,6 @@ func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
 	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl))
 	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten/batch", handler.APIPostBatch(service, config.ShortBaseUrl))
 	router.Get("/api/user/urls", handler.GetUserSites(service))
+	router.Delete("/api/user/urls", handler.AsyncDeleteUserSites(service))
 	return router, repo
 }

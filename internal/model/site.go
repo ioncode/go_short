@@ -27,4 +27,5 @@ type Site struct {
 	ShortUrl      ShortUrl
 	CorrelationId string
 	UserId        string
+	DeletedFlag   bool
 }

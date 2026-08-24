@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand/v2"
 	"sync"
+	"time"
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
@@ -32,19 +33,42 @@ type SiteRepository interface {
 	Close() error
 	BatchStoreSites(sites []model.Site) error
 	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
+	Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error
+}
+
+type DeleteTask struct {
+	Author  model.User
+	Aliases []model.ShortUrl
 }
 
 // service struct
 type Shortner struct {
 	repository SiteRepository
 	mutex      sync.Mutex
+	taskChan   chan DeleteTask // Общий канал-приемник (результат Fan-In)
 }
+
+// пул воркеров для асинхронного удаления
+const deleteWorkerCount = 10
+
+// буфер канала асинхронного удаления
+const deleteBuffer = 1024
 
 // service constructor with DI
 func NewShortner(r SiteRepository) *Shortner {
-	return &Shortner{
+	s := &Shortner{
 		repository: r,
+		taskChan:   make(chan DeleteTask, deleteBuffer),
 	}
+	for i := range deleteWorkerCount {
+		go s.deleteWorker(i)
+	}
+
+	return s
+}
+
+func (s *Shortner) Enqueue(task DeleteTask) {
+	s.taskChan <- task
 }
 
 func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
@@ -113,4 +137,20 @@ func (s *Shortner) BatchShort(items []model.BatchPostRequestItem, user model.Use
 
 func (s *Shortner) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
 	return s.repository.GetByUser(userId)
+}
+
+func (s *Shortner) deleteWorker(workerID int) {
+	log.Printf("Worker %d started", workerID)
+	for task := range s.taskChan {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+		err := s.repository.Delete(ctx, task.Aliases, task.Author)
+		if err != nil {
+			log.Printf("[Worker %d] Error deleting items for author %s: %v", workerID, task.Author.ID, err)
+		} else {
+			log.Printf("[Worker %d] Soft-deleted %d items for author %s", workerID, len(task.Aliases), task.Author.ID)
+		}
+
+		cancel()
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ioncode/go_short/internal/model"
@@ -38,7 +39,7 @@ type GetByUser interface {
 	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
 }
 
-func GetUserSites(s GetByUser) http.HandlerFunc {
+func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		user, ok := req.Context().Value(model.UserContextKey).(model.User)
 		if !ok {
@@ -55,6 +56,15 @@ func GetUserSites(s GetByUser) http.HandlerFunc {
 		if len(records) == 0 {
 			res.WriteHeader(http.StatusNoContent)
 			return
+		}
+
+		for i, record := range records {
+			url, err := url.JoinPath(shortBaseURL, string(record.Alias))
+			if err != nil {
+				writeJSONError(res, err.Error(), http.StatusBadRequest)
+				return
+			}
+			records[i].Alias = model.ShortUrl(url)
 		}
 
 		json.NewEncoder(res).Encode(records)

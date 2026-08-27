@@ -12,6 +12,7 @@ import (
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/ioncode/go_short/pkg"
 )
 
 type MockService struct {
@@ -54,7 +55,7 @@ func TestPost(t *testing.T) {
 				MockShort: tt.mockBehavior,
 			}
 			handler := handler.Post(service, "http://localhost:8080/")
-			ctx := context.WithValue(context.Background(), model.UserContextKey, model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
+			ctx := pkg.WithUser(context.Background(), &model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
 			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)

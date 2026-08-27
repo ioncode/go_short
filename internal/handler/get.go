@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/ioncode/go_short/pkg"
 )
 
 type GetService interface {
@@ -41,8 +42,8 @@ type GetByUser interface {
 
 func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		user, ok := req.Context().Value(model.UserContextKey).(model.User)
-		if !ok {
+		user, err := pkg.UserFromContext(req.Context())
+		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/service"
+	"github.com/ioncode/go_short/pkg"
 )
 
 type DeleteService interface {
@@ -14,20 +15,20 @@ type DeleteService interface {
 
 func AsyncDeleteUserSites(s DeleteService) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		user, ok := req.Context().Value(model.UserContextKey).(model.User)
-		if !ok {
+		user, err := pkg.UserFromContext(req.Context())
+		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
 		aliases := []model.ShortUrl{}
-		err := json.NewDecoder(req.Body).Decode(&aliases)
+		err = json.NewDecoder(req.Body).Decode(&aliases)
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		s.Enqueue(service.DeleteTask{
-			Author:  user,
+			Author:  *user,
 			Aliases: aliases,
 		})
 

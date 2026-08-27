@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -9,6 +10,29 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/ioncode/go_short/internal/model"
 )
+
+// Ошибки пакета
+var ErrUserNotFound = errors.New("user not found in context")
+
+// 1. Приватный тип для ключа контекста — исключает конфликты с другими пакетами
+type contextKey string
+
+// 2. Приватная константа с уникальным типом
+const userKey contextKey = "user"
+
+// 3. Функция-сеттер для безопасного добавления пользователя в контекст, экспортируется для использования в автотестах
+func WithUser(ctx context.Context, user *model.User) context.Context {
+	return context.WithValue(ctx, userKey, user)
+}
+
+// 4. Функция-геттер с проверкой наличия и корректности типа
+func UserFromContext(ctx context.Context) (*model.User, error) {
+	user, ok := ctx.Value(userKey).(*model.User)
+	if !ok || user == nil {
+		return nil, ErrUserNotFound
+	}
+	return user, nil
+}
 
 const cookieName = "user_id"
 
@@ -75,11 +99,11 @@ func (am *AuthMiddleware) EnsureUserHasID(next http.Handler) http.Handler {
 		}
 
 		// 4. Передаем пользователя в контекст запроса
-		claims := model.User{
+		claims := &model.User{
 			ID: userID,
 		}
 
-		ctx := context.WithValue(r.Context(), model.UserContextKey, claims)
+		ctx := WithUser(r.Context(), claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

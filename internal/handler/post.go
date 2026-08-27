@@ -10,6 +10,7 @@ import (
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
+	"github.com/ioncode/go_short/pkg"
 )
 
 type ShortService interface {
@@ -28,12 +29,12 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
-		user, ok := req.Context().Value(model.UserContextKey).(model.User)
-		if !ok {
+		user, err := pkg.UserFromContext(req.Context())
+		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
-		alias, err := s.Short(model.Url(body), user)
+		alias, err := s.Short(model.Url(body), *user)
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -64,12 +65,12 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 			writeJSONError(res, "Invalid JSON payload: "+err.Error(), http.StatusBadRequest)
 			return
 		}
-		user, ok := req.Context().Value(model.UserContextKey).(model.User)
-		if !ok {
+		user, err := pkg.UserFromContext(req.Context())
+		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
-		alias, err := s.Short(requestModel.URL, user)
+		alias, err := s.Short(requestModel.URL, *user)
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -122,12 +123,12 @@ func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 			writeJSONError(res, "No valid items in request", http.StatusBadRequest)
 			return
 		}
-		user, ok := req.Context().Value(model.UserContextKey).(model.User)
-		if !ok {
+		user, err := pkg.UserFromContext(req.Context())
+		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
-		response, err := s.BatchShort(validItems, user)
+		response, err := s.BatchShort(validItems, *user)
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusBadRequest)
 			return

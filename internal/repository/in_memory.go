@@ -171,6 +171,8 @@ func (r *MapRepository) Ping(context.Context) error {
 }
 
 func (r *MapRepository) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
 	result := []model.UserSitesResponseItem{}
 	for _, site := range r.sites {
 		if site.UserId == userId {
@@ -193,13 +195,13 @@ func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, us
 
 	for _, alias := range aliases {
 		if err := ctx.Err(); err != nil {
-		return err
-	}
+			return err
+		}
 		item, exists := r.sites[alias]
 		if exists && item.UserId == user.ID && !item.DeletedFlag {
-				item.DeletedFlag = true
-				r.sites[alias] = item
-			}
+			item.DeletedFlag = true
+			r.sites[alias] = item
+		}
 	}
 
 	return nil

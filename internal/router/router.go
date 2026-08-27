@@ -36,11 +36,7 @@ func responseHeadersMiddleware(next http.Handler) http.Handler {
 
 func requestContentLengthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Middleware processing request with length ", r.ContentLength)
-		if r.ContentLength > 7000 {
-			http.Error(w, "Request entity too large", http.StatusRequestEntityTooLarge)
-			return
-		}
+		r.Body = http.MaxBytesReader(w, r.Body, 7000)
 		next.ServeHTTP(w, r)
 	})
 }

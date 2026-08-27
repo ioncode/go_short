@@ -142,15 +142,19 @@ func (s *Shortner) GetByUser(userId string) ([]model.UserSitesResponseItem, erro
 func (s *Shortner) deleteWorker(workerID int) {
 	log.Printf("Worker %d started", workerID)
 	for task := range s.taskChan {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-
-		err := s.repository.Delete(ctx, task.Aliases, task.Author)
-		if err != nil {
-			log.Printf("[Worker %d] Error deleting items for author %s: %v", workerID, task.Author.ID, err)
-		} else {
-			log.Printf("[Worker %d] Soft-deleted %d items for author %s", workerID, len(task.Aliases), task.Author.ID)
-		}
-
-		cancel()
+		s.processDeleteTask(workerID, task)
 	}
+}
+
+func (s *Shortner) processDeleteTask(workerID int, task DeleteTask) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	err := s.repository.Delete(ctx, task.Aliases, task.Author)
+	if err != nil {
+		log.Printf("[Worker %d] Error deleting items for author %s: %v", workerID, task.Author.ID, err)
+		return
+	}
+
+	log.Printf("[Worker %d] Soft-deleted %d items for author %s", workerID, len(task.Aliases), task.Author.ID)
 }

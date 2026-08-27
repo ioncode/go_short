@@ -51,6 +51,7 @@ func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
 		records, err := s.GetByUser(user.ID)
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		if len(records) == 0 {

@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/lib/pq"
 )
 
 type PostgresSitesRepository struct {
@@ -159,7 +158,8 @@ func (r *PostgresSitesRepository) Delete(ctx context.Context, aliases []model.Sh
 		WHERE user_id = $1 
 		AND short_url = ANY($2) 
 		AND is_deleted = false;`
-
-	_, err := r.db.ExecContext(ctx, query, user.ID, pq.Array(aliases))
+	// pgx/v5/stdlib прозрачно преобразует []model.ShortUrl в массив БД,
+	// pq.Array(aliases) здесь больше писать НЕ НУЖНО.
+	_, err := r.db.ExecContext(ctx, query, user.ID, aliases)
 	return err
 }

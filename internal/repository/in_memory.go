@@ -82,34 +82,7 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 		}
 	}
 
-	info, err := r.file.Stat()
-	if err != nil {
-		return err
-	}
-
-	if info.Size() > 0 {
-		err := r.file.Truncate(0)
-		if err != nil {
-			return err
-		}
-		_, err = r.file.Seek(0, 0)
-		if err != nil {
-			return err
-		}
-	}
-
-	writer := bufio.NewWriter(r.file)
-	r.sites[site.ShortUrl] = site
-	//create slice of sites for storage
-	sites := slices.Collect(maps.Values(r.sites))
-	encoder := json.NewEncoder(writer)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(sites); err != nil {
-		return err
-	}
-	writer.Flush()
-
-	return nil
+	return r.flushToFile()
 }
 
 func (r *MapRepository) BatchStoreSites(sites []model.Site) error {
@@ -119,33 +92,7 @@ func (r *MapRepository) BatchStoreSites(sites []model.Site) error {
 		r.sites[site.ShortUrl] = site
 	}
 
-	info, err := r.file.Stat()
-	if err != nil {
-		return err
-	}
-
-	if info.Size() > 0 {
-		err := r.file.Truncate(0)
-		if err != nil {
-			return err
-		}
-		_, err = r.file.Seek(0, 0)
-		if err != nil {
-			return err
-		}
-	}
-
-	writer := bufio.NewWriter(r.file)
-	//create slice of sites for storage
-	allSites := slices.Collect(maps.Values(r.sites))
-	encoder := json.NewEncoder(writer)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(allSites); err != nil {
-		return err
-	}
-	writer.Flush()
-
-	return nil
+	return r.flushToFile()
 }
 
 func (r *MapRepository) GetByUrl(url model.Url) (model.Site, error) {
@@ -193,6 +140,7 @@ func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, us
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
+	var changed bool
 	for _, alias := range aliases {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -201,8 +149,42 @@ func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, us
 		if exists && item.UserId == user.ID && !item.DeletedFlag {
 			item.DeletedFlag = true
 			r.sites[alias] = item
+			changed = true
 		}
+	}
+	// Записываем в файл только если были реальные изменения флагов
+	if changed {
+		return r.flushToFile()
 	}
 
 	return nil
+}
+
+// flushToFile перезаписывает файл текущим состоянием r.sites.
+// Должен вызываться под заблокированным r.mutex.
+func (r *MapRepository) flushToFile() error {
+	info, err := r.file.Stat()
+	if err != nil {
+		return err
+	}
+
+	if info.Size() > 0 {
+		err := r.file.Truncate(0)
+		if err != nil {
+			return err
+		}
+		_, err = r.file.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	writer := bufio.NewWriter(r.file)
+	allSites := slices.Collect(maps.Values(r.sites))
+	encoder := json.NewEncoder(writer)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(allSites); err != nil {
+		return err
+	}
+	return writer.Flush()
 }

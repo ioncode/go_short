@@ -52,7 +52,7 @@ type Shortner struct {
 const deleteWorkerCount = 10
 
 // буфер канала асинхронного удаления
-const deleteBuffer = 1024
+const deleteBuffer = 10
 
 // service constructor with DI
 func NewShortner(r SiteRepository) *Shortner {

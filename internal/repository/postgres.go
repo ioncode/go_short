@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -36,10 +37,10 @@ func (r *PostgresSitesRepository) GetByAlias(alias model.ShortUrl) (model.Site, 
 	var site model.Site
 	err := row.Scan(&site.Url, &site.DeletedFlag)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return site, ErrSiteNotFound
 		}
-		return site, err
+		return site, fmt.Errorf("postgres: get site by alias %q: %w", alias, err)
 	}
 
 	site.ShortUrl = alias
@@ -56,10 +57,10 @@ func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
 	var site model.Site
 	err := row.Scan(&site.ShortUrl)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return site, ErrSiteNotFound
 		}
-		return site, err
+		return site, fmt.Errorf("postgres: get site by URL %q: %w", url, err)
 	}
 
 	site.Url = url

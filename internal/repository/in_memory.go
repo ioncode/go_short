@@ -82,6 +82,7 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 		}
 	}
 
+	r.sites[site.ShortUrl] = site
 	return r.flushToFile()
 }
 

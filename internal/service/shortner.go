@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand/v2"
 	"sync"
+	"time"
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
@@ -31,26 +32,50 @@ type SiteRepository interface {
 	Ping(ctx context.Context) error
 	Close() error
 	BatchStoreSites(sites []model.Site) error
+	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
+	Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error
+}
+
+type DeleteTask struct {
+	Author  model.User
+	Aliases []model.ShortUrl
 }
 
 // service struct
 type Shortner struct {
 	repository SiteRepository
 	mutex      sync.Mutex
+	taskChan   chan DeleteTask // Общий канал-приемник (результат Fan-In)
 }
+
+// пул воркеров для асинхронного удаления
+const deleteWorkerCount = 10
+
+// буфер канала асинхронного удаления
+const deleteBuffer = 10
 
 // service constructor with DI
 func NewShortner(r SiteRepository) *Shortner {
-	return &Shortner{
+	s := &Shortner{
 		repository: r,
+		taskChan:   make(chan DeleteTask, deleteBuffer),
 	}
+	for i := range deleteWorkerCount {
+		go s.deleteWorker(i)
+	}
+
+	return s
+}
+
+func (s *Shortner) Enqueue(task DeleteTask) {
+	s.taskChan <- task
 }
 
 func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
 	return s.repository.GetByAlias(alias)
 }
 
-func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
+func (s *Shortner) Short(url model.Url, user model.User) (model.ShortUrl, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -64,6 +89,7 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 	site := model.Site{
 		Url:      url,
 		ShortUrl: alias,
+		UserId:   user.ID,
 	}
 	err = s.repository.StoreSite(site)
 
@@ -78,7 +104,7 @@ func (s *Shortner) Short(url model.Url) (model.ShortUrl, error) {
 	return site.ShortUrl, err
 }
 
-func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.BatchPostResponseItem, error) {
+func (s *Shortner) BatchShort(items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -101,10 +127,34 @@ func (s *Shortner) BatchShort(items []model.BatchPostRequestItem) ([]model.Batch
 			}
 
 			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: alias})
-			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias})
+			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias, UserId: user.ID})
 		}
 	}
 
 	err := s.repository.BatchStoreSites(newSites)
 	return responseItems, err
+}
+
+func (s *Shortner) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+	return s.repository.GetByUser(userId)
+}
+
+func (s *Shortner) deleteWorker(workerID int) {
+	log.Printf("Worker %d started", workerID)
+	for task := range s.taskChan {
+		s.processDeleteTask(workerID, task)
+	}
+}
+
+func (s *Shortner) processDeleteTask(workerID int, task DeleteTask) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	err := s.repository.Delete(ctx, task.Aliases, task.Author)
+	if err != nil {
+		log.Printf("[Worker %d] Error deleting items for author %s: %v", workerID, task.Author.ID, err)
+		return
+	}
+
+	log.Printf("[Worker %d] Soft-deleted %d items for author %s", workerID, len(task.Aliases), task.Author.ID)
 }

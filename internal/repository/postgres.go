@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -30,16 +31,16 @@ func (r *PostgresSitesRepository) GetByAlias(alias model.ShortUrl) (model.Site, 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	row := r.db.QueryRowContext(ctx,
-		"SELECT url "+
+		"SELECT url, is_deleted "+
 			"FROM sites WHERE short_url = $1 LIMIT 1", alias)
 
 	var site model.Site
-	err := row.Scan(&site.Url)
+	err := row.Scan(&site.Url, &site.DeletedFlag)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return site, ErrSiteNotFound
 		}
-		return site, err
+		return site, fmt.Errorf("postgres: get site by alias %q: %w", alias, err)
 	}
 
 	site.ShortUrl = alias
@@ -56,20 +57,51 @@ func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
 	var site model.Site
 	err := row.Scan(&site.ShortUrl)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return site, ErrSiteNotFound
 		}
-		return site, err
+		return site, fmt.Errorf("postgres: get site by URL %q: %w", url, err)
 	}
 
 	site.Url = url
 	return site, nil
 }
 
+func (r *PostgresSitesRepository) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	records := []model.UserSitesResponseItem{}
+
+	query := `SELECT url, short_url FROM sites WHERE user_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, userId)
+	if err != nil {
+		return records, err
+	}
+	defer rows.Close()
+
+	// Читаем строки из БД
+	for rows.Next() {
+		var rec model.UserSitesResponseItem
+		err := rows.Scan(&rec.URL, &rec.Alias)
+		if err != nil {
+			return records, err
+		}
+		records = append(records, rec)
+	}
+
+	// Проверяем, не возникло ли ошибок при итерации
+	if err = rows.Err(); err != nil {
+		return records, err
+	}
+
+	return records, nil
+}
+
 func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err := r.db.ExecContext(ctx, "INSERT INTO SITES (url, short_url) VALUES ($1, $2)", site.Url, site.ShortUrl)
+	_, err := r.db.ExecContext(ctx, "INSERT INTO SITES (url, short_url, user_id) VALUES ($1, $2, $3)", site.Url, site.ShortUrl, site.UserId)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -95,7 +127,7 @@ func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
 	rows := [][]any{}
 
 	for _, site := range sites {
-		rows = append(rows, []any{site.Url, site.ShortUrl, site.CorrelationId})
+		rows = append(rows, []any{site.Url, site.ShortUrl, site.CorrelationId, site.UserId})
 	}
 
 	err = connection.Raw(func(driverConn any) error {
@@ -108,7 +140,7 @@ func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
 		_, err = pgxConn.CopyFrom(
 			ctx,
 			pgx.Identifier{"sites"},
-			[]string{"url", "short_url", "correlation_id"},
+			[]string{"url", "short_url", "correlation_id", "user_id"},
 			pgx.CopyFromRows(rows),
 		)
 		return err
@@ -119,4 +151,16 @@ func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {
 
 func (r *PostgresSitesRepository) Close() error {
 	return r.db.Close()
+}
+
+func (r *PostgresSitesRepository) Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error {
+	query := `
+		UPDATE sites SET is_deleted = true 
+		WHERE user_id = $1 
+		AND short_url = ANY($2) 
+		AND is_deleted = false;`
+	// pgx/v5/stdlib прозрачно преобразует []model.ShortUrl в массив БД,
+	// pq.Array(aliases) здесь больше писать НЕ НУЖНО.
+	_, err := r.db.ExecContext(ctx, query, user.ID, aliases)
+	return err
 }

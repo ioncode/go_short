@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/ioncode/go_short/pkg"
 )
 
 type GetService interface {
@@ -23,6 +26,49 @@ func Get(s GetService) http.HandlerFunc {
 			http.Error(res, string(alias)+": "+err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		if site.DeletedFlag {
+			res.WriteHeader(http.StatusGone)
+			return
+		}
+
 		http.Redirect(res, req, string(site.Url), http.StatusTemporaryRedirect)
+	}
+}
+
+type GetByUser interface {
+	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
+}
+
+func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		user, err := pkg.UserFromContext(req.Context())
+		if err != nil {
+			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
+			return
+		}
+		log.Println("Started user get request handler " + user.ID)
+
+		records, err := s.GetByUser(user.ID)
+		if err != nil {
+			writeJSONError(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if len(records) == 0 {
+			res.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		for i, record := range records {
+			url, err := url.JoinPath(shortBaseURL, string(record.Alias))
+			if err != nil {
+				writeJSONError(res, err.Error(), http.StatusBadRequest)
+				return
+			}
+			records[i].Alias = model.ShortUrl(url)
+		}
+
+		json.NewEncoder(res).Encode(records)
 	}
 }

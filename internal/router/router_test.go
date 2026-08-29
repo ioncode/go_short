@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -18,6 +19,17 @@ func Test_middleware(t *testing.T) {
 		if contentType != "text/plain" {
 			t.Error("Content type not correct:", contentType)
 		}
+		_, err := io.ReadAll(r.Body)
+		if err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				http.Error(w, "Too Large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	})
 
 	tests := []struct {

@@ -5,6 +5,8 @@ import (
 	"os"
 )
 
+// Config содержит глобальные настройки конфигурации приложения,
+// считываемые из флагов командной строки или переменных окружения.
 type Config struct {
 	ServerAddress string
 	ShortBaseUrl  string
@@ -12,8 +14,13 @@ type Config struct {
 	DataBaseDSN   string
 }
 
-func ParseFlags() Config {
-	var cfg Config
+// ParseFlags парсит переданные флаги командной строки и проверяет
+// наличие соответствующих переменных окружения.
+// Возвращает указатель на объект Config для предотвращения лишнего копирования в памяти.
+func ParseFlags() *Config {
+	// Инициализируем структуру через указатель
+	cfg := &Config{}
+
 	flag.StringVar(&cfg.ServerAddress, "a", ":8080", "адрес запуска HTTP-сервера")
 	flag.StringVar(&cfg.ShortBaseUrl, "b", "http://localhost:8080/", " базовый адрес результирующего сокращённого URL")
 	flag.StringVar(&cfg.StoragePath, "f", "storage.json", "путь к файлу для сохранения сайтов")

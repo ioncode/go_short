@@ -1,10 +1,14 @@
 package router
 
 import (
+	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -16,8 +20,10 @@ import (
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/logger"
 	"github.com/ioncode/go_short/internal/repository"
+	"github.com/ioncode/go_short/internal/router/audit"
 	"github.com/ioncode/go_short/internal/service"
 	"github.com/ioncode/go_short/pkg"
+	"golang.org/x/sync/errgroup"
 )
 
 func responseHeadersMiddleware(next http.Handler) http.Handler {
@@ -41,13 +47,54 @@ func requestContentLengthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func Serve(config config.Config) {
-	router, repo := SetupRouter(config)
+func Serve(ctx context.Context, config *config.Config) error {
+	router, repo, auditor := SetupRouter(ctx, config)
 	defer repo.Close()
-	log.Fatal(http.ListenAndServe(config.ServerAddress, logger.ResponseLogger(logger.RequestLogger(router))))
+	srv := &http.Server{
+		Addr:    config.ServerAddress,
+		Handler: logger.ResponseLogger(logger.RequestLogger(router)),
+	}
+
+	// Создаем локальную группу ошибок для отслеживания параллельных процессов веб-слоя
+	eg, localCtx := errgroup.WithContext(ctx)
+
+	// 1. Запуск HTTP-сервера
+	eg.Go(func() error {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("Ошибка запуска HTTP сервера: %w", err)
+		}
+		return nil
+	})
+
+	// 2. Ожидание сигнала отмены контекста и последующий Graceful Shutdown
+	eg.Go(func() error {
+		<-localCtx.Done()
+
+		log.Println("HTTP сервер и аудитор получили сигнал остановки")
+
+		var shutdownErr error
+
+		// Останавливаем HTTP-сервер
+		httpCtx, cancelHttp := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelHttp()
+		if err := srv.Shutdown(httpCtx); err != nil {
+			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("Ошибка остановки HTTP сервера: %w", err))
+		}
+
+		// Останавливаем аудитор
+		if err := auditor.Shutdown(5 * time.Second); err != nil {
+			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("Ошибка остановки аудитора: %w", err))
+		}
+
+		return shutdownErr
+	})
+
+	// Ждем завершения процессов веб-компонента.
+	// Если ListenAndServe упадет, eg.Wait() сразу вернет ошибку в main.
+	return eg.Wait()
 }
 
-func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
+func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, service.SiteRepository, *audit.Auditor) {
 	var repo service.SiteRepository
 	if config.DataBaseDSN == "" {
 		repo = repository.NewMapRepository(config.StoragePath)
@@ -72,13 +119,16 @@ func SetupRouter(config config.Config) (http.Handler, service.SiteRepository) {
 
 	service := service.NewShortner(repo)
 
+	// Передаем родительский ctx в аудитор
+	auditor := audit.New(ctx, logger.Log, 500, 4)
+
 	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware, authMiddleware.EnsureUserHasID)
-	router.Get("/{alias}", handler.Get(service))
+	router.With(auditor.Middleware).Get("/{alias}", handler.Get(service))
 	router.Get("/ping", handler.Ping(repo))
-	router.With(chiMiddleware.AllowContentType("text/plain")).Post("/", handler.Post(service, config.ShortBaseUrl))
-	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl))
+	router.With(chiMiddleware.AllowContentType("text/plain"), auditor.Middleware).Post("/", handler.Post(service, config.ShortBaseUrl))
+	router.With(chiMiddleware.AllowContentType("application/json"), auditor.Middleware).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl))
 	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten/batch", handler.APIPostBatch(service, config.ShortBaseUrl))
 	router.Get("/api/user/urls", handler.GetUserSites(service, config.ShortBaseUrl))
 	router.Delete("/api/user/urls", handler.AsyncDeleteUserSites(service))
-	return router, repo
+	return router, repo, auditor
 }

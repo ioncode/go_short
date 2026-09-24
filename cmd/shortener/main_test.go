@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -20,7 +21,7 @@ import (
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
 
-	router, repo := router.SetupRouter(config.Config{
+	router, repo, _ := router.SetupRouter(context.Background(), &config.Config{
 		ServerAddress: ":8080",
 		ShortBaseUrl:  "http://localhost:8080/",
 		StoragePath:   "test_storage.json",

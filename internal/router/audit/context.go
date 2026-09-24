@@ -20,9 +20,8 @@ func SetField(r *http.Request, key string, value interface{}) {
 	}
 }
 
-// SetAction является специализированным хелпером для явной установки
-// действия запроса ("shorten", "follow" и др.) из хендлера в контекст аудита.
-func SetAction(r *http.Request, action string) {
+// SetAction устанавливает типизированное действие запроса (audit.ActionShorten, audit.ActionFollow).
+func SetAction(r *http.Request, action Action) {
 	SetField(r, actionInternalKey, action)
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/ioncode/go_short/internal/model"
+	"github.com/ioncode/go_short/internal/router/audit"
 	"github.com/ioncode/go_short/pkg"
 )
 
@@ -31,6 +32,9 @@ func Get(s GetService) http.HandlerFunc {
 			res.WriteHeader(http.StatusGone)
 			return
 		}
+
+		audit.SetAction(req, audit.ActionFollow)
+		audit.SetURL(req, string(site.Url))
 
 		http.Redirect(res, req, string(site.Url), http.StatusTemporaryRedirect)
 	}

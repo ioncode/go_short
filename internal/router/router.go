@@ -23,6 +23,7 @@ import (
 	"github.com/ioncode/go_short/internal/router/audit"
 	"github.com/ioncode/go_short/internal/service"
 	"github.com/ioncode/go_short/pkg"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -121,6 +122,17 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 
 	// Передаем родительский ctx в аудитор
 	auditor := audit.New(ctx, logger.Log, 500, 4)
+
+	// Динамически подключаем аудит в файл, если передан параметр
+	if config.AuditFile != "" {
+		fileObs, err := audit.NewFileObserver(config.AuditFile, logger.Log)
+		if err != nil {
+			logger.Log.Error("Не удалось подключить файловый приемник аудита", zap.Error(err))
+		} else {
+			auditor.Register(fileObs)
+			logger.Log.Info("Файловый приемник аудита успешно подключен")
+		}
+	}
 
 	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware, authMiddleware.EnsureUserHasID)
 	router.With(auditor.Middleware).Get("/{alias}", handler.Get(service))

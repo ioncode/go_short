@@ -12,6 +12,8 @@ type Config struct {
 	ShortBaseUrl  string
 	StoragePath   string
 	DataBaseDSN   string
+	AuditFile     string
+	AuditURL      string
 }
 
 // ParseFlags парсит переданные флаги командной строки и проверяет
@@ -25,6 +27,8 @@ func ParseFlags() *Config {
 	flag.StringVar(&cfg.ShortBaseUrl, "b", "http://localhost:8080/", " базовый адрес результирующего сокращённого URL")
 	flag.StringVar(&cfg.StoragePath, "f", "storage.json", "путь к файлу для сохранения сайтов")
 	flag.StringVar(&cfg.DataBaseDSN, "d", "", "параметры подключения к БД")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "audit.json", "путь к файлу-приёмнику логов аудита")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL удаленного сервера-приёмника логов аудита")
 	flag.Parse()
 
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
@@ -41,6 +45,13 @@ func ParseFlags() *Config {
 
 	if envDataBaseDSN := os.Getenv("DATABASE_DSN"); envDataBaseDSN != "" {
 		cfg.DataBaseDSN = envDataBaseDSN
+	}
+
+	if envAuditFile := os.Getenv("AUDIT_FILE"); envAuditFile != "" {
+		cfg.AuditFile = envAuditFile
+	}
+	if envAuditURL := os.Getenv("AUDIT_URL"); envAuditURL != "" {
+		cfg.AuditURL = envAuditURL
 	}
 
 	return cfg

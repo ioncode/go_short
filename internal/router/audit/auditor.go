@@ -56,6 +56,7 @@ func (a *Auditor) Register(o Observer) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.observers = append(a.observers, o)
+	a.logger.Info("Добавлен новый приемник событий аудита", zap.String("name", o.Name()))
 }
 
 // Notify отправляет событие в очередь для последующей обработки воркерами.
@@ -70,7 +71,7 @@ func (a *Auditor) Notify(event Event) {
 		logger.Log.Warn("Очередь аудита переполнена, событие пропущено",
 			zap.String("method", event.Method),
 			zap.String("path", event.Path),
-			zap.String("action", event.Action),
+			zap.String("action", string(event.Action)),
 		)
 	}
 }
@@ -128,7 +129,22 @@ func (a *Auditor) Shutdown(timeout time.Duration) error {
 
 	select {
 	case err := <-done:
-		a.logger.Info("Аудитор успешно остановлен, все оповещения корректно обработаны")
+		a.logger.Info("Аудитор успешно остановлен, все оповещения корректно обработаны. Освобождаем ресурсы приемников...")
+
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		for _, observer := range a.observers {
+			// Проверяем с помощью утверждения типов (Type Assertion),
+			// умеет ли конкретный наблюдатель закрывать за собой ресурсы
+			if closer, ok := observer.(interface{ Close() error }); ok {
+				if cErr := closer.Close(); cErr != nil {
+					a.logger.Error("Не удалось освободить ресурсы приемника", zap.String("name", observer.Name()), zap.Error(cErr))
+				} else {
+					a.logger.Info("Ресурсы приемника корректно освобождены", zap.String("name", observer.Name()))
+				}
+			}
+		}
+
 		return err
 	case <-ctx.Done():
 		a.logger.Error("Процесс остановки прерван по окончании времени ожидания, возможна потеря данных")

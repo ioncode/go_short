@@ -40,9 +40,9 @@ func (a *Auditor) Middleware(next http.Handler) http.Handler {
 				userID = user.ID
 			}
 
-			// Извлекаем действие
-			var action string
-			if act, ok := customData[actionInternalKey].(string); ok {
+			// Извлекаем действие и приводим к типу Action
+			var action Action
+			if act, ok := customData[actionInternalKey].(Action); ok {
 				action = act
 				delete(customData, actionInternalKey)
 			}
@@ -55,7 +55,7 @@ func (a *Auditor) Middleware(next http.Handler) http.Handler {
 			}
 
 			a.Notify(Event{
-				Timestamp:  time.Now(),
+				TS:         time.Now().Unix(),
 				Method:     r.Method,
 				Path:       r.URL.Path,
 				StatusCode: wrapper.statusCode,

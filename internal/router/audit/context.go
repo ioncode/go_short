@@ -12,11 +12,12 @@ const (
 	urlInternalKey    = "_audit_url"
 )
 
-// SetField сохраняет произвольное значение по ключу в контекст текущего запроса.
-// Используется внутри HTTP-хендлеров для передачи специфичных данных.
-func SetField(r *http.Request, key string, value interface{}) {
-	if data, ok := r.Context().Value(auditDataKey).(map[string]interface{}); ok {
-		data[key] = value
+// SetField сохраняет произвольное значение по ключу в контейнер контекста
+func SetField(r *http.Request, key string, value any) {
+	if container, ok := r.Context().Value(auditDataKey).(*auditContainer); ok {
+		container.mu.Lock()
+		container.data[key] = value
+		container.mu.Unlock()
 	}
 }
 
@@ -25,8 +26,7 @@ func SetAction(r *http.Request, action Action) {
 	SetField(r, actionInternalKey, action)
 }
 
-// SetURL является специализированным хелпером для установки оригинального
-// (не сокращенного) URL из хендлера в контекст аудита.
+// SetURL устанавливает оригинальный URL из хендлера
 func SetURL(r *http.Request, longURL string) {
 	SetField(r, urlInternalKey, longURL)
 }

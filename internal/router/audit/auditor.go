@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ioncode/go_short/internal/logger"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -68,7 +67,7 @@ func (a *Auditor) Notify(event Event) {
 		return
 	case a.queue <- event:
 	default:
-		logger.Log.Warn("Очередь аудита переполнена, событие пропущено",
+		a.logger.Warn("Очередь аудита переполнена, событие пропущено",
 			zap.String("method", event.Method),
 			zap.String("path", event.Path),
 			zap.String("action", string(event.Action)),

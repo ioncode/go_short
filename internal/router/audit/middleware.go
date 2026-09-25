@@ -24,45 +24,50 @@ func (rw *responseWriterWrapper) WriteHeader(code int) {
 // Middleware возвращает chi-совместимый обработчик промежуточного ПО.
 func (a *Auditor) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		customData := make(map[string]interface{})
+		// 1. Берем готовый контейнер из пула вместо аллокации нового
+		container := getAuditContainer()
 
-		ctx := context.WithValue(r.Context(), auditDataKey, customData)
-		r = r.WithContext(ctx)
+		// Гарантируем возврат контейнера в пул при любом исходе (даже при панике хендлера)
+		defer container.release()
 
 		wrapper := &responseWriterWrapper{ResponseWriter: w, statusCode: http.StatusOK}
+		ctx := context.WithValue(r.Context(), auditDataKey, container)
 
-		next.ServeHTTP(wrapper, r)
+		// Передаем управление дальше по цепочке
+		next.ServeHTTP(wrapper, r.WithContext(ctx))
 
-		// Допускаются успешные ответы и любые перенаправления (200-399)
+		// Фильтруем по статус-кодам
 		if wrapper.statusCode >= 200 && wrapper.statusCode < 400 {
 			var userID string
 			if user, err := pkg.UserFromContext(r.Context()); err == nil && user != nil {
 				userID = user.ID
 			}
 
-			// Извлекаем действие и приводим к типу Action
+			// 2. Делаем быстрый снимок данных
+			customDataCopy := container.snapshot()
+
 			var action Action
-			if act, ok := customData[actionInternalKey].(Action); ok {
+			if act, ok := customDataCopy[actionInternalKey].(Action); ok {
 				action = act
-				delete(customData, actionInternalKey)
+				delete(customDataCopy, actionInternalKey)
 			}
 
-			// Извлекаем оригинальный URL
 			var longURL string
-			if u, ok := customData[urlInternalKey].(string); ok {
+			if u, ok := customDataCopy[urlInternalKey].(string); ok {
 				longURL = u
-				delete(customData, urlInternalKey)
+				delete(customDataCopy, urlInternalKey)
 			}
 
+			// Отправляем изолированную копию в асинхронный воркер
 			a.Notify(Event{
 				TS:         time.Now().Unix(),
+				UserID:     userID,
+				Action:     action,
+				URL:        longURL,
 				Method:     r.Method,
 				Path:       r.URL.Path,
 				StatusCode: wrapper.statusCode,
-				UserID:     userID,
-				Action:     action,
-				URL:        longURL, // Заполняем поле URL
-				CustomData: customData,
+				CustomData: customDataCopy,
 			})
 		}
 	})

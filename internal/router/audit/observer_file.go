@@ -2,10 +2,10 @@ package audit
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"sync"
 
+	json "github.com/goccy/go-json"
 	"go.uber.org/zap"
 )
 

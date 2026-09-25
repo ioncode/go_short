@@ -3,13 +3,15 @@ package audit
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
+	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
+	json "github.com/goccy/go-json"
 	"go.uber.org/zap"
 )
 
@@ -39,48 +41,68 @@ const (
 )
 
 // RemoteObserver реализует интерфейс Observer для асинхронной
-// отправки событий аудита на удаленный сервер по протоколу HTTP POST.
-//
-// Обладает встроенной отказоустойчивостью: использует экспоненциальную
-// задержку с рандомизацией (Exponential Backoff с Jitter) для повторных попыток
-// и паттерн Circuit Breaker (Предохранитель) для предотвращения лавинных сбоев.
+// отправки событий аудита на удаленный server по протоколу HTTP POST.
 type RemoteObserver struct {
 	client *http.Client
 	url    string
 	logger *zap.Logger
 
+	// Предохранитель
 	cbMu             sync.RWMutex
 	failureCount     int
 	circuitState     CircuitState
 	nextAttemptAfter time.Time
+
+	// Пул предопределенных HTTP-запросов для исключения аллокаций сетевого стека
+	reqPool sync.Pool
 }
 
 // NewRemoteObserver инициализирует и возвращает новый экземпляр RemoteObserver.
-// Принимает целевой URL сервера-приемника логов и настроенный логгер zap.Logger.
-func NewRemoteObserver(url string, logger *zap.Logger) *RemoteObserver {
-	return &RemoteObserver{
-		url:          url,
+func NewRemoteObserver(targetURL string, logger *zap.Logger) *RemoteObserver {
+	parsedURL, err := url.Parse(targetURL)
+	if err != nil {
+		logger.Error("Критическая ошибка: не удалось распарсить URL удаленного аудита", zap.Error(err))
+	}
+
+	obs := &RemoteObserver{
+		url:          targetURL,
 		client:       &http.Client{Timeout: 3 * time.Second},
 		logger:       logger.Named("audit_remote_observer"),
 		circuitState: StateClosed,
 	}
+
+	// Инициализируем пул запросов. Карты заголовков и URL парсятся ОДИН раз при старте приложения.
+	obs.reqPool = sync.Pool{
+		New: func() any {
+			req := &http.Request{
+				Method:     http.MethodPost,
+				URL:        parsedURL,
+				Proto:      "HTTP/1.1",
+				ProtoMajor: 1,
+				ProtoMinor: 1,
+				Header:     make(http.Header),
+				Host:       parsedURL.Host,
+			}
+			req.Header.Set("Content-Type", "application/json")
+			return req
+		},
+	}
+
+	return obs
 }
 
 // Name возвращает человекочитаемое имя сетевого приемника логов.
-// Используется диспетчером Auditor для ведения системных журналов остановки и регистрации.
 func (r *RemoteObserver) Name() string { return "Сетевой приемник" }
 
 // OnRequest сериализует пришедшее событие Event в JSON и отправляет его
-// на удаленный сервер. Метод вызывается асинхронно пулом фоновых воркеров Auditor.
-// В случае сетевых сбоев метод автоматически запускает цепочку ретраев.
+// на удаленный сервер с минимальным количеством аллокаций памяти.
 func (r *RemoteObserver) OnRequest(ctx context.Context, e Event) {
 	if !r.allowRequest() {
 		r.logger.Warn("Предохранитель РАЗОМКНУТ. Сетевой запрос пропущен для экономии ресурсов воркеров.")
 		return
 	}
 
-	// Использование json.Marshal сразу создает изолированный срез байт в памяти.
-	// Это исключает гонку данных с другими воркерами и не требует сложного пулирования.
+	// Использование json.Marshal поверх структуры со скрытыми тегами
 	payload, err := json.Marshal(e)
 	if err != nil {
 		r.logger.Error("Не удалось закодировать событие для отправки", zap.Error(err))
@@ -119,8 +141,7 @@ func (r *RemoteObserver) OnRequest(ctx context.Context, e Event) {
 	}
 }
 
-// allowRequest проверяет состояние предохранителя и решает,
-// разрешено ли выполнять физический сетевой запрос в данный момент времени.
+// allowRequest проверяет состояние предохранителя атомарно.
 func (r *RemoteObserver) allowRequest() bool {
 	r.cbMu.Lock()
 	defer r.cbMu.Unlock()
@@ -130,7 +151,6 @@ func (r *RemoteObserver) allowRequest() bool {
 	}
 
 	if r.circuitState == StateOpen {
-		// Если время остывания прошло, ТОЛЬКО один поток переводит в HALF-OPEN и идет в сеть
 		if time.Now().After(r.nextAttemptAfter) {
 			r.circuitState = StateHalfOpen
 			r.logger.Info("Предохранитель перешел в режим ожидания (HALF-OPEN). Пробуем отправить тестовый лог.")
@@ -139,13 +159,10 @@ func (r *RemoteObserver) allowRequest() bool {
 		return false
 	}
 
-	// Если состояние УЖЕ HALF-OPEN (тестовый запрос уже летит в сеть),
-	// все остальные параллельные потоки на это время блокируются.
 	return false
 }
 
-// recordSuccess сбрасывает счетчики ошибок и переводит предохранитель
-// в исходное рабочее состояние StateClosed после успешной сетевой операции.
+// recordSuccess сбрасывает счетчики ошибок.
 func (r *RemoteObserver) recordSuccess() {
 	r.cbMu.Lock()
 	defer r.cbMu.Unlock()
@@ -157,8 +174,7 @@ func (r *RemoteObserver) recordSuccess() {
 	r.failureCount = 0
 }
 
-// recordFailure увеличивает счетчик сбоев и размыкает цепь предохранителя (StateOpen),
-// если лимит ошибок исчерпан или если тестовый запрос в режиме HALF-OPEN завершился неудачей.
+// recordFailure фиксирует сбой.
 func (r *RemoteObserver) recordFailure() {
 	r.cbMu.Lock()
 	defer r.cbMu.Unlock()
@@ -175,13 +191,21 @@ func (r *RemoteObserver) recordFailure() {
 	}
 }
 
-// sendRequest выполняет единичный атомарный HTTP POST запрос с передачей сырых JSON-байтов.
+// sendRequest выполняет сетевую операцию, переиспользуя объект http.Request из пула.
 func (r *RemoteObserver) sendRequest(ctx context.Context, payload []byte) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.url, bytes.NewReader(payload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// Достаем готовый предскомпилированный скелет запроса
+	req := r.reqPool.Get().(*http.Request)
+
+	// Возвращаем запрос назад в пул сразу по окончании работы метода
+	defer r.reqPool.Put(req)
+
+	// Перепривязываем текущий контекст горутины
+	req = req.WithContext(ctx)
+
+	// Подменяем тело запроса "на лету" без перевыделения структуры.
+	// bytes.NewReader работает поверх существующего payload без копирования.
+	req.Body = io.NopCloser(bytes.NewReader(payload))
+	req.ContentLength = int64(len(payload))
 
 	resp, err := r.client.Do(req)
 	if err != nil {
@@ -195,8 +219,7 @@ func (r *RemoteObserver) sendRequest(ctx context.Context, payload []byte) error 
 	return nil
 }
 
-// Close закрывает все неиспользуемые праздные (idle) постоянные сетевые соединения,
-// удерживаемые внутренним http.Client. Вызывается автоматически при graceful shutdown аудитора.
+// Close закрывает свободные сетевые соединения.
 func (r *RemoteObserver) Close() error {
 	r.client.CloseIdleConnections()
 	return nil

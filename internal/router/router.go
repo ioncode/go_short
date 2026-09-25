@@ -134,6 +134,15 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 		}
 	}
 
+	// и в сетевой приемник
+	if config.AuditURL != "" {
+		remoteObs := audit.NewRemoteObserver(config.AuditURL, logger.Log)
+
+		// Регистрируем сетевого наблюдателя в центральном диспетчере
+		auditor.Register(remoteObs)
+		logger.Log.Info("Сетевой приемник аудита успешно подключен", zap.String("target_url", config.AuditURL))
+	}
+
 	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware, authMiddleware.EnsureUserHasID)
 	router.With(auditor.Middleware).Get("/{alias}", handler.Get(service))
 	router.Get("/ping", handler.Ping(repo))

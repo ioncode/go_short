@@ -21,6 +21,7 @@ import (
 	"github.com/ioncode/go_short/internal/logger"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/router/audit"
+	"github.com/ioncode/go_short/internal/router/audit/remote"
 	"github.com/ioncode/go_short/internal/service"
 	"github.com/ioncode/go_short/pkg"
 	"go.uber.org/zap"
@@ -136,11 +137,13 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 
 	// и в сетевой приемник
 	if config.AuditURL != "" {
-		remoteObs := audit.NewRemoteObserver(config.AuditURL, logger.Log)
-
-		// Регистрируем сетевого наблюдателя в центральном диспетчере
-		auditor.Register(remoteObs)
-		logger.Log.Info("Сетевой приемник аудита успешно подключен", zap.String("target_url", config.AuditURL))
+		remoteObs, err := remote.NewRemoteObserver(config.AuditURL, logger.Log)
+		if err != nil {
+			logger.Log.Error("Не удалось подключить сетевой приемник аудита", zap.Error(err))
+		} else {
+			auditor.Register(remoteObs)
+			logger.Log.Info("Сетевой приемник аудита успешно подключен", zap.String("target_url", config.AuditURL))
+		}
 	}
 
 	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware, authMiddleware.EnsureUserHasID)

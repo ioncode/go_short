@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/logger"
@@ -43,6 +47,28 @@ func main() {
 	g.Go(func() error {
 		// router.Serve блокируется, принимает контекст отмены и возвращает error
 		return router.Serve(gCtx, cfg)
+	})
+
+	// Добавление изолированного сервера pprof в errgroup
+	g.Go(func() error {
+		pprofServer := &http.Server{
+			Addr:    "localhost:6060",
+			Handler: http.DefaultServeMux,
+		}
+
+		go func() {
+			<-gCtx.Done()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = pprofServer.Shutdown(shutdownCtx)
+		}()
+
+		logger.Log.Info("Запуск профилировщика pprof", zap.String("pprof_address", "http://localhost:6060/debug/pprof/"))
+		if err := pprofServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Log.Error("Сервер pprof аварийно остановлен", zap.Error(err))
+			return err
+		}
+		return nil
 	})
 
 	// 6. Блокируемся в main и ждем либо сигнала от ОС, либо отмены gCtx при ошибке в запущенных компонентах

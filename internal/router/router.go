@@ -117,6 +117,10 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 
 	sc := securecookie.New(hashKey, nil)
 
+	// КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: полностью отключаем Gob.
+	// Теперь securecookie работает со строкой UUID напрямую, минуя оверхед в 111 МБ мусора!
+	sc.SetSerializer(pkg.StringCodec{})
+
 	authMiddleware := pkg.NewAuthMiddleware(sc)
 
 	service := service.NewShortner(repo)

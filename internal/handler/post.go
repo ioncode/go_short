@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
+	"sync"
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
@@ -21,20 +23,50 @@ type BatchShortService interface {
 	BatchShort(items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error)
 }
 
+// requestPool переиспользует оперативную память для чтения входящих HTTP-запросов.
+// Устанавливаем емкость 8192 байта (8 КБ), что с запасом перекрывает
+// системный лимит в 7000 байт, заданный в requestContentLengthMiddleware.
+var requestPool = sync.Pool{
+	New: func() any {
+		return bytes.NewBuffer(make([]byte, 0, 8192))
+	},
+}
+
+// Post обрабатывает текстовые запросы на сокращение URL.
 func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
+	// Предварительно очищаем базовый URL от слэшей справа ОДИН раз при инициализации роутера.
+	// Это избавляет приложение от вызова тяжелого url.JoinPath на каждый входящий запрос.
+	trimmedBaseURL := strings.TrimSuffix(shortBaseURL, "/")
+
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Println("Started Post handler")
-		body, err := io.ReadAll(req.Body)
+		// 1. Извлекаем буфер из пула памяти
+		buf := requestPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer requestPool.Put(buf)
+
+		// 2. Вычитываем тело запроса напрямую в пуленный буфер.
+		// Ограничение в 7000 байт уже контролируется http.MaxBytesReader из middleware.
+		_, err := buf.ReadFrom(req.Body)
 		if err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
+			// Если middleware оборвал чтение из-за превышения лимита, возвращаем Bad Request
+			http.Error(res, "Превышен максимальный размер тела запроса", http.StatusBadRequest)
 			return
 		}
+
+		bodyBytes := buf.Bytes()
+		if len(bodyBytes) == 0 {
+			http.Error(res, "Тело запроса не может быть пустым", http.StatusBadRequest)
+			return
+		}
+
 		user, err := pkg.UserFromContext(req.Context())
 		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
-		alias, err := s.Short(model.Url(body), *user)
+
+		// 3. Бизнес-логика создания сокращенной ссылки
+		alias, err := s.Short(model.Url(bodyBytes), *user)
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -44,13 +76,14 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 				return
 			}
 		}
+
 		res.WriteHeader(respStatus)
-		url, err := url.JoinPath(shortBaseURL, string(alias))
-		if err != nil {
-			http.Error(res, err.Error(), http.StatusBadRequest)
-			return
-		}
-		res.Write([]byte(url))
+
+		// 4. Оптимизированная сборка результирующей строки.
+		// Конкатенация строк в Go 1.26+ эффективно выделяет память за один проход аллокатора.
+		resultURL := trimmedBaseURL + "/" + string(alias)
+
+		res.Write([]byte(resultURL))
 	}
 }
 

@@ -3,10 +3,12 @@ package pkg
 import (
 	"compress/gzip"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"strings"
+
+	"github.com/ioncode/go_short/internal/logger"
+	"go.uber.org/zap"
 )
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера
@@ -84,7 +86,9 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		contentType := r.Header.Get("Content-Type")
 		mediaType, _, err := mime.ParseMediaType(contentType)
 		if err != nil {
-			log.Println("Error parsing mediatype from content type", contentType, r.Header)
+			logger.Log.Debug("Error parsing mediatype from content type",
+				zap.String("content_type", contentType),
+			)
 			//http.Error(w, "Invalid Content-Type header", http.StatusBadRequest)
 			//return
 		}
@@ -109,7 +113,9 @@ func GzipMiddleware(next http.Handler) http.Handler {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("Error creating gzip compressor", err)
+				logger.Log.Error("Error creating gzip compressor",
+					zap.Error(err),
+				)
 				return
 			}
 			// меняем тело запроса на новое

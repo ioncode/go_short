@@ -82,7 +82,6 @@ func (s *Shortner) Short(url model.Url, user model.User) (model.ShortUrl, error)
 	alias := model.ShortUrl(stringWithCharset(8))
 	_, err := s.repository.GetByAlias(alias)
 	for err == nil {
-		log.Println("This alias allready taken, generating new one", alias)
 		alias = model.ShortUrl(stringWithCharset(8))
 		_, err = s.repository.GetByAlias(alias)
 	}
@@ -121,7 +120,6 @@ func (s *Shortner) BatchShort(items []model.BatchPostRequestItem, user model.Use
 			alias := model.ShortUrl(stringWithCharset(8))
 			_, err = s.repository.GetByAlias(alias)
 			for err == nil {
-				log.Println("This alias allready taken, generating new one", alias)
 				alias = model.ShortUrl(stringWithCharset(8))
 				_, err = s.repository.GetByAlias(alias)
 			}

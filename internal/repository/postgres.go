@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/ioncode/go_short/internal/model"
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -101,15 +99,26 @@ func (r *PostgresSitesRepository) GetByUser(userId string) ([]model.UserSitesRes
 func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err := r.db.ExecContext(ctx, "INSERT INTO SITES (url, short_url, user_id) VALUES ($1, $2, $3)", site.Url, site.ShortUrl, site.UserId)
+
+	// ОПТИМИЗАЦИЯ: Используем ON CONFLICT (url) DO NOTHING.
+	// Если URL уже существует, Postgres просто пропустит вставку, НЕ генерируя ошибку в логи.
+	result, err := r.db.ExecContext(ctx,
+		"INSERT INTO SITES (url, short_url, user_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING",
+		site.Url, site.ShortUrl, site.UserId,
+	)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == pgerrcode.UniqueViolation {
-				return ErrSiteExists
-			}
-		}
-		return err
+		return fmt.Errorf("postgres: insert site error: %w", err)
+	}
+
+	// Проверяем, сколько строк было физически вставлено
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("postgres: get rows affected error: %w", err)
+	}
+
+	// Если RowsAffected == 0, значит сработал ON CONFLICT (запись уже была в БД)
+	if rowsAffected == 0 {
+		return ErrSiteExists
 	}
 
 	return nil

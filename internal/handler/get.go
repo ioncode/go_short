@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/url"
 
@@ -19,7 +18,6 @@ type GetService interface {
 func Get(s GetService) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		path := chi.URLParam(req, "alias")
-		log.Println("Started get request handler with path " + path)
 		alias := model.ShortUrl(path)
 		site, err := s.Get(alias)
 
@@ -51,7 +49,6 @@ func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
-		log.Println("Started user get request handler " + user.ID)
 
 		records, err := s.GetByUser(user.ID)
 		if err != nil {

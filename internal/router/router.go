@@ -25,6 +25,7 @@ import (
 	"github.com/ioncode/go_short/internal/service"
 	"github.com/ioncode/go_short/pkg"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -52,9 +53,17 @@ func requestContentLengthMiddleware(next http.Handler) http.Handler {
 func Serve(ctx context.Context, config *config.Config) error {
 	router, repo, auditor := SetupRouter(ctx, config)
 	defer repo.Close()
+	// По умолчанию отдаем чистый роутер без накладных расходов логгера
+	var finalHandler http.Handler = router
+
+	// Проверяем уровень логирования один раз при старте сервера.
+	// Подключаем middleware, только если в конфиге включен уровень Info (или ниже)
+	if logger.Log.Core().Enabled(zapcore.InfoLevel) {
+		finalHandler = logger.ResponseLogger(logger.RequestLogger(router))
+	}
 	srv := &http.Server{
 		Addr:    config.ServerAddress,
-		Handler: logger.ResponseLogger(logger.RequestLogger(router)),
+		Handler: finalHandler,
 	}
 
 	// Создаем локальную группу ошибок для отслеживания параллельных процессов веб-слоя
@@ -71,8 +80,6 @@ func Serve(ctx context.Context, config *config.Config) error {
 	// 2. Ожидание сигнала отмены контекста и последующий Graceful Shutdown
 	eg.Go(func() error {
 		<-localCtx.Done()
-
-		log.Println("HTTP сервер и аудитор получили сигнал остановки")
 
 		var shutdownErr error
 
@@ -109,6 +116,18 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 		if err != nil {
 			log.Fatalf("Failed to open connection: %v", err)
 		}
+		// === НАЧАЛО ОПТИМИЗАЦИИ ПУЛА СОЕДИНЕНИЙ ===
+		// 1. Ограничиваем максимальное количество ОДНОВРЕМЕННО ОТКРЫТЫХ соединений к СУБД.
+		// Значение должно быть строго меньше, чем max_connections в настройках самого Postgres (например, 20-30).
+		sqlDB.SetMaxOpenConns(30)
+
+		// 2. Ограничиваем максимальное количество простаивающих (idle) соединений в пуле.
+		// Это удерживает сессии открытыми, предотвращая постоянные вызовы connect/dial на каждый запрос.
+		sqlDB.SetMaxIdleConns(30)
+
+		// 3. Время жизни соединения в пуле (предотвращает утечки памяти и ресурсов на стороне СУБД)
+		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+		// === КОНЕЦ ОПТИМИЗАЦИИ ===
 		repo = repository.NewPostgresSitesRepository(sqlDB)
 	}
 

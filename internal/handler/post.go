@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -94,7 +93,6 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 
 func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Println("Started Api Post handler")
 		var requestModel model.PostRequest
 		decoder := json.NewDecoder(req.Body)
 		decoder.DisallowUnknownFields()
@@ -140,7 +138,6 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 
 func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		log.Println("Started Batch Api Post handler")
 		var items []model.BatchPostRequestItem
 		decoder := json.NewDecoder(req.Body)
 		decoder.DisallowUnknownFields()

@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/ioncode/go_short/pkg"
@@ -21,6 +22,22 @@ func (rw *responseWriterWrapper) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
+var wrapperPool = sync.Pool{
+	New: func() any {
+		return &responseWriterWrapper{}
+	},
+}
+
+func getResponseWrapper() *responseWriterWrapper {
+	return wrapperPool.Get().(*responseWriterWrapper)
+}
+
+func (rw *responseWriterWrapper) release() {
+	rw.ResponseWriter = nil
+	rw.statusCode = 0
+	wrapperPool.Put(rw)
+}
+
 // Middleware возвращает chi-совместимый обработчик промежуточного ПО.
 func (a *Auditor) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +47,11 @@ func (a *Auditor) Middleware(next http.Handler) http.Handler {
 		// Гарантируем возврат контейнера в пул при любом исходе (даже при панике хендлера)
 		defer container.release()
 
-		wrapper := &responseWriterWrapper{ResponseWriter: w, statusCode: http.StatusOK}
+		wrapper := getResponseWrapper()
+		defer wrapper.release()
+		wrapper.ResponseWriter = w
+		wrapper.statusCode = http.StatusOK
+
 		ctx := context.WithValue(r.Context(), auditDataKey, container)
 
 		// Передаем управление дальше по цепочке

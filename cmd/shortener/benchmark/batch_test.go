@@ -8,7 +8,7 @@ import (
 )
 
 func Benchmark_E2E_Batch_NoCompression(b *testing.B) {
-	ctx, appRouter, _ := initBenchEnv()
+	env := initBenchEnv(b)
 	rawBuf := make([]byte, 0, 256)
 	var counter uint64
 
@@ -20,12 +20,12 @@ func Benchmark_E2E_Batch_NoCompression(b *testing.B) {
 
 		resetRecorder(res)
 
-		executePostRequest(b, ctx, appRouter, "/api/shorten/batch", "application/json", "", "", rawBuf, res)
+		executePostRequest(b, env.Ctx, env.Router, "/api/shorten/batch", "application/json", "", "", rawBuf, res, env.Cookie)
 	}
 }
 
 func Benchmark_E2E_Batch_WithRequestCompression(b *testing.B) {
-	ctx, appRouter, _ := initBenchEnv()
+	env := initBenchEnv(b)
 	rawBuf := make([]byte, 0, 256)
 	gzipBuf := bytes.NewBuffer(make([]byte, 0, 512))
 	gzipWriter := gzip.NewWriter(gzipBuf)
@@ -44,12 +44,12 @@ func Benchmark_E2E_Batch_WithRequestCompression(b *testing.B) {
 
 		resetRecorder(res)
 
-		executePostRequest(b, ctx, appRouter, "/api/shorten/batch", "application/json", "gzip", "", gzipBuf.Bytes(), res)
+		executePostRequest(b, env.Ctx, env.Router, "/api/shorten/batch", "application/json", "gzip", "", gzipBuf.Bytes(), res, env.Cookie)
 	}
 }
 
 func Benchmark_E2E_Batch_WithFullCompression(b *testing.B) {
-	ctx, appRouter, _ := initBenchEnv()
+	env := initBenchEnv(b)
 	rawBuf := make([]byte, 0, 256)
 	gzipBuf := bytes.NewBuffer(make([]byte, 0, 512))
 	gzipWriter := gzip.NewWriter(gzipBuf)
@@ -68,6 +68,6 @@ func Benchmark_E2E_Batch_WithFullCompression(b *testing.B) {
 
 		resetRecorder(res)
 
-		executePostRequest(b, ctx, appRouter, "/api/shorten/batch", "application/json", "gzip", "gzip", gzipBuf.Bytes(), res)
+		executePostRequest(b, env.Ctx, env.Router, "/api/shorten/batch", "application/json", "gzip", "gzip", gzipBuf.Bytes(), res, env.Cookie)
 	}
 }

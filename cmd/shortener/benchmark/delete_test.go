@@ -26,7 +26,7 @@ func generateDeleteJSON(buf []byte, counter uint64) []byte {
 
 // Benchmark_E2E_DeleteUserSites замеряет скорость постановки задач на асинхронное удаление
 func Benchmark_E2E_DeleteUserSites(b *testing.B) {
-	ctx, appRouter, _ := initBenchEnv()
+	env := initBenchEnv(b)
 
 	// Выделяем переиспользуемые буферы под JSON и Reader тела запроса
 	rawBuf := make([]byte, 0, 128)
@@ -49,19 +49,19 @@ func Benchmark_E2E_DeleteUserSites(b *testing.B) {
 		bodyReader.Reset(rawBuf)
 
 		// 3. Конструируем запрос на удаление
-		req, err := http.NewRequestWithContext(ctx, http.MethodDelete, "/api/user/urls", bodyReader)
+		req, err := http.NewRequestWithContext(env.Ctx, http.MethodDelete, "/api/user/urls", bodyReader)
 		if err != nil {
 			b.Fatalf("критическая ошибка создания запроса: %v", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 
 		// 4. Подставляем валидную перехваченную куку авторизации
-		if authCookie != nil {
-			req.AddCookie(authCookie)
+		if env.Cookie != nil {
+			req.AddCookie(env.Cookie)
 		}
 
 		// 5. Отправляем запрос в роутер
-		appRouter.ServeHTTP(res, req)
+		env.Router.ServeHTTP(res, req)
 
 		// 6. Достаем результирующий статус-код сервера
 		respResult := res.Result()

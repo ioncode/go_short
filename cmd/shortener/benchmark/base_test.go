@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -15,54 +16,64 @@ import (
 	"github.com/ioncode/go_short/internal/service"
 )
 
-// Глобальный синк для предотвращения оптимизаций компилятора
 var benchSink *httptest.ResponseRecorder
 
-// Глобальные переменные окружения бенчмарков
-var (
-	//  переменная для хранения перехваченной валидной куки авторизации
-	authCookie  *http.Cookie
-	benchUserID string // Сохраняем чистый UUID здесь один раз при старте!
-)
+func init() {
+	log.SetOutput(io.Discard)
+}
 
-// initBenchEnv создает изолированный роутер и перехватывает валидную сессию
-func initBenchEnv() (context.Context, http.Handler, service.SiteRepository) {
+// Структура для возврата полной изоляции окружения
+type BenchEnv struct {
+	Ctx    context.Context
+	Router http.Handler
+	Repo   service.SiteRepository
+	Cookie *http.Cookie
+	UserID string
+}
+
+func initBenchEnv(b *testing.B) BenchEnv {
 	ctx := context.Background()
 	cfg := &config.Config{
 		ServerAddress: ":8080",
 		ShortBaseUrl:  "http://localhost:8080/",
-		StoragePath:   "", // Только RAM
+		StoragePath:   "", // Чистая RAM
 	}
 
 	appRouter, repo, _ := router.SetupRouter(ctx, cfg)
 
-	if authCookie == nil {
-		// 1. Делаем один прогревочный POST-запрос
-		warmupURL := "https://baseline-warmup.com"
-		req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "/", bytes.NewReader([]byte(warmupURL)))
-		req.Header.Set("Content-Type", "text/plain")
+	// Прогревочный запрос для перехвата сессии инстанса роутера
+	warmupURL := "https://baseline-warmup.com"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "/", bytes.NewReader([]byte(warmupURL)))
+	if err != nil {
+		b.Fatalf("ошибка прогревочного запроса: %v", err)
+	}
+	req.Header.Set("Content-Type", "text/plain")
 
-		res := httptest.NewRecorder()
-		appRouter.ServeHTTP(res, req)
+	res := httptest.NewRecorder()
+	appRouter.ServeHTTP(res, req)
 
-		// 2. Перехватываем зашифрованную куку авторизации для b.Loop
-		for _, c := range res.Result().Cookies() {
-			if c.Name == "user_id" {
-				authCookie = c
-				break
-			}
-		}
-
-		// 3. Мгновенно достаем расшифрованный UserId из репозитория по оригинальному URL
-		if site, err := repo.GetByUrl(model.Url(warmupURL)); err == nil {
-			benchUserID = site.UserId
+	var cookie *http.Cookie
+	for _, c := range res.Result().Cookies() {
+		if c.Name == "user_id" {
+			cookie = c
+			break
 		}
 	}
 
-	return ctx, appRouter, repo
+	var userID string
+	if site, err := repo.GetByUrl(model.Url(warmupURL)); err == nil {
+		userID = site.UserId
+	}
+
+	return BenchEnv{
+		Ctx:    ctx,
+		Router: appRouter,
+		Repo:   repo,
+		Cookie: cookie,
+		UserID: userID,
+	}
 }
 
-// generateBatchJSON собирает JSON батча без аллокаций в куче
 func generateBatchJSON(buf []byte, counter uint64) []byte {
 	p1 := []byte(`[{"correlation_id":"id1_`)
 	p2 := []byte(`","original_url":"https://yandex.ru_`)
@@ -83,14 +94,12 @@ func generateBatchJSON(buf []byte, counter uint64) []byte {
 	return buf
 }
 
-// resetRecorder безопасно очищает рекордер, не ломая внутреннюю HTTP-семантику пакета httptest
 func resetRecorder(res *httptest.ResponseRecorder) {
 	res.Code = 0
 	res.Body.Reset()
 	res.HeaderMap = make(http.Header)
 }
 
-// executePostRequest — строго типизированная функция для отправки POST-запросов и их валидации
 func executePostRequest(
 	b *testing.B,
 	ctx context.Context,
@@ -101,9 +110,9 @@ func executePostRequest(
 	acceptEncoding string,
 	payload []byte,
 	res *httptest.ResponseRecorder,
+	cookie *http.Cookie,
 ) {
 	bodyReader := bytes.NewReader(payload)
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, bodyReader)
 	if err != nil {
 		b.Fatalf("критическая ошибка создания запроса: %v", err)
@@ -119,15 +128,14 @@ func executePostRequest(
 		req.Header.Set("Accept-Encoding", acceptEncoding)
 	}
 
-	// Подставляем честно подписанную куку сессии
-	if authCookie != nil {
-		req.AddCookie(authCookie)
+	if cookie != nil {
+		req.AddCookie(cookie)
 	}
 
 	router.ServeHTTP(res, req)
 
 	respResult := res.Result()
-	defer respResult.Body.Close()
+	respResult.Body.Close()
 
 	if respResult.StatusCode != http.StatusCreated {
 		b.Fatalf("Ожидался статус 201, получен %d: %s", respResult.StatusCode, res.Body.String())
@@ -138,6 +146,5 @@ func executePostRequest(
 			b.Fatalf("ошибка вычитки gzipped-ответа: %v", err)
 		}
 	}
-
 	benchSink = res
 }

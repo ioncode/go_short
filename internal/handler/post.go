@@ -12,6 +12,7 @@ import (
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
+	"github.com/ioncode/go_short/internal/router/audit"
 	"github.com/ioncode/go_short/pkg"
 )
 
@@ -83,6 +84,10 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 		// Конкатенация строк в Go 1.26+ эффективно выделяет память за один проход аллокатора.
 		resultURL := trimmedBaseURL + "/" + string(alias)
 
+		// 5. Установка атрибутов аудита
+		audit.SetAction(req, audit.ActionShorten)
+		audit.SetURL(req, string(bodyBytes))
+
 		res.Write([]byte(resultURL))
 	}
 }
@@ -123,6 +128,11 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 		result := model.PostResponse{
 			Result: url,
 		}
+
+		//  Установка атрибутов аудита
+		audit.SetAction(req, audit.ActionShorten)
+		audit.SetURL(req, string(requestModel.URL))
+
 		res.WriteHeader(respStatus)
 		json.NewEncoder(res).Encode(result)
 	}

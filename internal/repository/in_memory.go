@@ -28,6 +28,14 @@ type MapRepository struct {
 }
 
 func NewMapRepository(storagePath string) *MapRepository {
+
+	if storagePath == "" {
+		return &MapRepository{
+			sites: make(map[model.ShortUrl]model.Site),
+			file:  nil,
+		}
+	}
+
 	file, err := os.OpenFile(storagePath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalln("Storage path not opened", err, storagePath)
@@ -83,6 +91,9 @@ func (r *MapRepository) StoreSite(site model.Site) error {
 	}
 
 	r.sites[site.ShortUrl] = site
+	if r.file == nil {
+		return nil
+	}
 	return r.flushToFile()
 }
 
@@ -92,7 +103,9 @@ func (r *MapRepository) BatchStoreSites(sites []model.Site) error {
 	for _, site := range sites {
 		r.sites[site.ShortUrl] = site
 	}
-
+	if r.file == nil {
+		return nil
+	}
 	return r.flushToFile()
 }
 
@@ -111,6 +124,9 @@ func (r *MapRepository) GetByUrl(url model.Url) (model.Site, error) {
 }
 
 func (r *MapRepository) Close() error {
+	if r.file == nil {
+		return nil
+	}
 	return r.file.Close()
 }
 
@@ -155,6 +171,9 @@ func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, us
 	}
 	// Записываем в файл только если были реальные изменения флагов
 	if changed {
+		if r.file == nil {
+			return nil
+		}
 		return r.flushToFile()
 	}
 
@@ -164,6 +183,9 @@ func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, us
 // flushToFile перезаписывает файл текущим состоянием r.sites.
 // Должен вызываться под заблокированным r.mutex.
 func (r *MapRepository) flushToFile() error {
+	if r.file == nil {
+		return nil
+	}
 	info, err := r.file.Stat()
 	if err != nil {
 		return err

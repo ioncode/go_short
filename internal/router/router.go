@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,16 +28,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func responseHeadersMiddleware(next http.Handler) http.Handler {
+// Оставляем общую мидлварь только для CORS (ставим на весь роутер)
+func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-
-		if strings.HasPrefix(r.RequestURI, "/api/") {
-			w.Header().Set("Content-Type", "application/json")
-		} else {
-			w.Header().Set("Content-Type", "text/plain")
-		}
-
 		next.ServeHTTP(w, r)
 	})
 }
@@ -169,7 +162,7 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 		}
 	}
 
-	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, responseHeadersMiddleware, authMiddleware.EnsureUserHasID)
+	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, corsMiddleware, authMiddleware.EnsureUserHasID)
 	router.With(auditor.Middleware).Get("/{alias}", handler.Get(service))
 	router.Get("/ping", handler.Ping(repo))
 	router.With(chiMiddleware.AllowContentType("text/plain"), auditor.Middleware).Post("/", handler.Post(service, config.ShortBaseUrl))

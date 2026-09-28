@@ -44,6 +44,7 @@ type GetByUser interface {
 
 func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("Content-Type", "application/json")
 		user, err := pkg.UserFromContext(req.Context())
 		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)

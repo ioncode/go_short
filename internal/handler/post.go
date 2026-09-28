@@ -39,6 +39,7 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 	trimmedBaseURL := strings.TrimSuffix(shortBaseURL, "/")
 
 	return func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("Content-Type", "text/plain")
 		// 1. Извлекаем буфер из пула памяти
 		buf := requestPool.Get().(*bytes.Buffer)
 		buf.Reset()
@@ -93,6 +94,7 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 
 func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("Content-Type", "application/json")
 		var requestModel model.PostRequest
 		decoder := json.NewDecoder(req.Body)
 		decoder.DisallowUnknownFields()
@@ -138,6 +140,7 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 
 func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("Content-Type", "application/json")
 		var items []model.BatchPostRequestItem
 		decoder := json.NewDecoder(req.Body)
 		decoder.DisallowUnknownFields()

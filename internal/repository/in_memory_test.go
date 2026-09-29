@@ -147,7 +147,7 @@ func TestMapRepository_StoreSite(t *testing.T) {
 				ShortUrl: "sfdsfgd",
 			})
 
-			gotErr := r.StoreSite(tt.site)
+			_, gotErr := r.StoreSite(tt.site)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("StoreSite() failed: %v", gotErr)

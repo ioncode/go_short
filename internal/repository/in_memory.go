@@ -15,8 +15,9 @@ import (
 
 // Ошибки бизнес-логики репозитория.
 var (
-	ErrSiteExists   = errors.New("Site allready shorted")
-	ErrSiteNotFound = errors.New("Site not found")
+	ErrSiteExists    = errors.New("Site allready shorted")
+	ErrSiteNotFound  = errors.New("Site not found")
+	ErrAliasConflict = errors.New("Alias allready generated, try new one")
 )
 
 // MapRepository — это потокобезопасная реализация хранилища сокращенных ссылок в оперативной памяти (RAM).
@@ -118,36 +119,62 @@ func (r *MapRepository) GetByAlias(alias model.ShortUrl) (model.Site, error) {
 	return model.Site{}, ErrSiteNotFound
 }
 
-// StoreSite сохраняет информацию о сокращенном сайте в репозиторий.
+// StoreSite атомарно сохраняет информацию о сокращенном сайте в RAM-репозиторий.
 //
-// Метод выполняет потокобезопасную проверку уникальности ShortUrl и оригинального Url
-// за время O(1) с помощью хэш-индексов, полностью исключая линейный перебор мапы.
-// Если сайт с таким Url или ShortUrl уже существует, возвращается ошибка ErrSiteExists.
-// После успешного обновления RAM-индексов данные сбрасываются в файл,
+// Метод полностью потокобезопасен и оптимизирован для конкурентной среды:
+//   - Захватывает эксклюзивную блокировку (Lock) на время проверки индексов и вставки.
+//   - За константное время O(1) проверяет уникальность сгенерированного ShortUrl.
+//   - За константное время O(1) проверяет, не был ли оригинальный Url сокращен ранее.
+//
+// Если оригинальный Url уже присутствует в системе, метод возвращает его существующий
+// короткий алиас и ошибку-маркер ErrSiteExists.
+// После успешного обновления RAM-индексов данные асинхронно сбрасываются в файл,
 // если для репозитория задан файловый путь персистентности.
-func (r *MapRepository) StoreSite(site model.Site) error {
+//
+// Параметры:
+//   - site: структура model.Site с оригинальным URL, сгенерированным алиасом и ID пользователя.
+//
+// Возвращаемые значения:
+//   - model.ShortUrl: итоговый алиас (новый сгенерированный или уже существующий в базе).
+//   - error: nil при успешном сохранении; ErrAliasConflict, если сгенерированная строка
+//     совпала с чужим алиасом; ErrSiteExists, если длинный URL уже сокращен;
+//     системная ошибка при сбое записи на диск.
+func (r *MapRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
-	// Проверка уникальности ShortUrl по индексу sites за O(1)
+	// 1. Проверяем коллизию сгенерированного короткого алиаса по индексу sites за O(1).
+	// Если такой буквенно-цифровой код уже занят другим сайтом, возвращаем ошибку коллизии,
+	// чтобы сервис Shortner мог уйти на следующий круг генерации строки.
 	if _, ok := r.sites[site.ShortUrl]; ok {
-		return ErrSiteExists
+		return "", ErrAliasConflict
 	}
 
-	// Быстрая проверка уникальности оригинального Url по индексу urls за O(1).
-	// Больше никакого цикла по всей базе!
-	if _, ok := r.urls[site.Url]; ok {
-		return ErrSiteExists
+	// 2. Быстрая проверка уникальности оригинального Url по хэш-индексу urls за O(1).
+	// Если URL уже сокращен (в текущем или параллельном запросе), мы атомарно
+	// извлекаем и возвращаем его старый алиас вместе с ошибкой ErrSiteExists.
+	if existingSite, ok := r.urls[site.Url]; ok {
+		return existingSite.ShortUrl, ErrSiteExists
 	}
 
-	// Компактный вызов вместо дублирования логики.
-	// Передаем адрес структуры, создавая устойчивую связь во всех мапах.
-	r.addIndexes(&site)
+	// 3. Если проверки пройдены, создаем изолированную копию структуры в куче
+	// и атомарно раскидываем указатели по всем трем внутренним мапам-индексам.
+	allocatedSite := new(model.Site)
+	*allocatedSite = site
+	r.addIndexes(allocatedSite)
 
+	// 4. Если персистентность отключена (RAM-режим для бенчмарков), завершаем операцию
 	if r.file == nil {
-		return nil
+		return site.ShortUrl, nil
 	}
-	return r.flushToFile()
+
+	// 5. Синхронизируем состояние RAM-памяти с диском.
+	// В случае ошибки записи возвращаем пустую строку и ошибку ввода-вывода.
+	if err := r.flushToFile(); err != nil {
+		return "", err
+	}
+
+	return site.ShortUrl, nil
 }
 
 // BatchStoreSites выполняет пакетное сохранение среза сайтов в репозиторий.

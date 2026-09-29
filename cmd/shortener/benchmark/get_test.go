@@ -13,7 +13,7 @@ func Benchmark_E2E_Get_Alias(b *testing.B) {
 	env := initBenchEnv(b)
 
 	targetAlias := model.ShortUrl("yandex")
-	err := env.Repo.StoreSite(model.Site{
+	_, err := env.Repo.StoreSite(model.Site{
 		ShortUrl: targetAlias,
 		Url:      "https://yandex.ru",
 	})
@@ -56,7 +56,7 @@ func Benchmark_E2E_GetUserSites(b *testing.B) {
 	// База чистая! Вставка пройдет мгновенно за O(1)
 	for i := 1; i <= 5; i++ {
 		idxStr := strconv.Itoa(i)
-		err := env.Repo.StoreSite(model.Site{
+		_, err := env.Repo.StoreSite(model.Site{
 			ShortUrl: model.ShortUrl("get_user_alias_" + idxStr),
 			Url:      model.Url("https://get-user-sites.com" + idxStr),
 			UserId:   env.UserID,

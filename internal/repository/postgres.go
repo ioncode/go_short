@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -96,32 +98,47 @@ func (r *PostgresSitesRepository) GetByUser(userId string) ([]model.UserSitesRes
 	return records, nil
 }
 
-func (r *PostgresSitesRepository) StoreSite(site model.Site) error {
+func (r *PostgresSitesRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	// ОПТИМИЗАЦИЯ: Используем ON CONFLICT (url) DO NOTHING.
-	// Если URL уже существует, Postgres просто пропустит вставку, НЕ генерируя ошибку в логи.
-	result, err := r.db.ExecContext(ctx,
-		"INSERT INTO SITES (url, short_url, user_id) VALUES ($1, $2, $3) ON CONFLICT (url) DO NOTHING",
-		site.Url, site.ShortUrl, site.UserId,
-	)
+	// Направляем ON CONFLICT строго на индекс оригинального URL (idx_sites_url).
+	// Если URL уже существует, мы делаем фиктивный апдейт (url = SITES.url),
+	// чтобы сработал RETURNING и вернул нам старый short_url.
+	query := `
+		INSERT INTO SITES (url, short_url, user_id) 
+		VALUES ($1, $2, $3)
+		ON CONFLICT (url) DO UPDATE SET url = SITES.url
+		RETURNING short_url;
+	`
+
+	var resultAlias string
+	err := r.db.QueryRowContext(ctx, query, site.Url, site.ShortUrl, site.UserId).Scan(&resultAlias)
+
 	if err != nil {
-		return fmt.Errorf("postgres: insert site error: %w", err)
+		// Проверяем, не является ли ошибка результатом коллизии сгенерированного short_url
+		var pgErr *pgconn.PgError // Если используете jackc/pgx/v5
+		if errors.As(err, &pgErr) {
+			// Код ошибки 23505 — unique_violation
+			if pgErr.Code == "23505" {
+				// Если имя нарушенного индекса/ограничения содержит short_url,
+				// значит, наш генератор случайно выдал уже существующий в базе токен.
+				if strings.Contains(pgErr.ConstraintName, "short_url") {
+					return "", ErrAliasConflict // Возвращаем маркер, сервис уйдет на ретрай
+				}
+			}
+		}
+		return "", fmt.Errorf("postgres: store site error: %w", err)
 	}
 
-	// Проверяем, сколько строк было физически вставлено
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("postgres: get rows affected error: %w", err)
+	// Если возвращенный из базы алиас НЕ совпадает с тем, который мы генерировали,
+	// значит сработал триггер ON CONFLICT, и этот URL уже существовал в системе.
+	if resultAlias != string(site.ShortUrl) {
+		return model.ShortUrl(resultAlias), ErrSiteExists
 	}
 
-	// Если RowsAffected == 0, значит сработал ON CONFLICT (запись уже была в БД)
-	if rowsAffected == 0 {
-		return ErrSiteExists
-	}
-
-	return nil
+	// Успешная вставка новой уникальной ссылки
+	return site.ShortUrl, nil
 }
 
 func (r *PostgresSitesRepository) BatchStoreSites(sites []model.Site) error {

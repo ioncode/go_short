@@ -27,8 +27,6 @@ func Initialize(level string) error {
 	}
 	// создаём новую конфигурацию логера
 	cfg := zap.NewProductionConfig()
-	// устанавливаем уровень
-	cfg.Level = lvl
 	// === НАЧАЛО ОПТИМИЗАЦИИ ДЛЯ ПРОДАКШЕНА (АСИНХРОННОСТЬ) ===
 	// 1. Берем стандартный вывод (консоль)
 	stderrSyncer := zapcore.Lock(os.Stderr)

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -54,7 +55,8 @@ func TestPost(t *testing.T) {
 			service := &MockService{
 				MockShort: tt.mockBehavior,
 			}
-			handler := handler.Post(service, "http://localhost:8080/")
+			bu, _ := url.Parse("http://localhost:8080/")
+			handler := handler.Post(service, bu)
 			ctx := pkg.WithUser(context.Background(), &model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
 			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()

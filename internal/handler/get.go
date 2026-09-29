@@ -42,7 +42,7 @@ type GetByUser interface {
 	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
 }
 
-func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
+func GetUserSites(s GetByUser, shortBaseURL *url.URL) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Content-Type", "application/json")
 		user, err := pkg.UserFromContext(req.Context())
@@ -62,13 +62,10 @@ func GetUserSites(s GetByUser, shortBaseURL string) http.HandlerFunc {
 			return
 		}
 
+		u := *shortBaseURL
 		for i, record := range records {
-			url, err := url.JoinPath(shortBaseURL, string(record.Alias))
-			if err != nil {
-				writeJSONError(res, err.Error(), http.StatusBadRequest)
-				return
-			}
-			records[i].Alias = model.ShortUrl(url)
+			u.Path = string(record.Alias)
+			records[i].Alias = model.ShortUrl(u.String())
 		}
 
 		json.NewEncoder(res).Encode(records)

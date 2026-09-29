@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 
 	"github.com/ioncode/go_short/internal/model"
@@ -33,11 +32,7 @@ var requestPool = sync.Pool{
 }
 
 // Post обрабатывает текстовые запросы на сокращение URL.
-func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
-	// Предварительно очищаем базовый URL от слэшей справа ОДИН раз при инициализации роутера.
-	// Это избавляет приложение от вызова тяжелого url.JoinPath на каждый входящий запрос.
-	trimmedBaseURL := strings.TrimSuffix(shortBaseURL, "/")
-
+func Post(s ShortService, shortBaseURL *url.URL) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Content-Type", "text/plain")
 		// 1. Извлекаем буфер из пула памяти
@@ -81,8 +76,9 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 		res.WriteHeader(respStatus)
 
 		// 4. Оптимизированная сборка результирующей строки.
-		// Конкатенация строк в Go 1.26+ эффективно выделяет память за один проход аллокатора.
-		resultURL := trimmedBaseURL + "/" + string(alias)
+		u := *shortBaseURL
+		u.Path = string(alias)
+		resultURL := u.String()
 
 		// 5. Установка атрибутов аудита
 		audit.SetAction(req, audit.ActionShorten)
@@ -92,7 +88,7 @@ func Post(s ShortService, shortBaseURL string) http.HandlerFunc {
 	}
 }
 
-func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
+func APIPost(s ShortService, shortBaseURL *url.URL) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Content-Type", "application/json")
 		var requestModel model.PostRequest
@@ -118,12 +114,9 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 				return
 			}
 		}
-
-		url, err := url.JoinPath(shortBaseURL, string(alias))
-		if err != nil {
-			writeJSONError(res, err.Error(), http.StatusBadRequest)
-			return
-		}
+		u := *shortBaseURL
+		u.Path = string(alias)
+		url := u.String()
 
 		result := model.PostResponse{
 			Result: url,
@@ -138,7 +131,7 @@ func APIPost(s ShortService, shortBaseURL string) http.HandlerFunc {
 	}
 }
 
-func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
+func APIPostBatch(s BatchShortService, shortBaseURL *url.URL) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Content-Type", "application/json")
 		var items []model.BatchPostRequestItem
@@ -176,14 +169,13 @@ func APIPostBatch(s BatchShortService, shortBaseURL string) http.HandlerFunc {
 			writeJSONError(res, err.Error(), http.StatusBadRequest)
 			return
 		}
-
+		// Создаем одну копию структуры на стек функции
+		u := *shortBaseURL
 		for i, responseItem := range response {
-			url, err := url.JoinPath(shortBaseURL, string(responseItem.Alias))
-			if err != nil {
-				writeJSONError(res, err.Error(), http.StatusBadRequest)
-				return
-			}
-			response[i].Alias = model.ShortUrl(url)
+			// Просто перезаписываем поле для каждого элемента батча
+			u.Path = string(responseItem.Alias)
+			// Выделяется память только под одну конечную строку через strings.Builder внутри .String()
+			response[i].Alias = model.ShortUrl(u.String())
 		}
 		res.WriteHeader(http.StatusCreated)
 		json.NewEncoder(res).Encode(response)

@@ -10,7 +10,7 @@ import (
 // Config содержит глобальные настройки конфигурации приложения.
 type Config struct {
 	ServerAddress string
-	ShortBaseUrl  string
+	ShortBaseUrl  *url.URL
 	StoragePath   string
 	DataBaseDSN   string
 	AuditFile     string
@@ -21,9 +21,9 @@ type Config struct {
 // а также выполняет нормализацию и валидацию критичных сетевых адресов.
 func ParseFlags() *Config {
 	cfg := &Config{}
-
+	var rawShortBaseURL string
 	flag.StringVar(&cfg.ServerAddress, "a", ":8080", "адрес запуска HTTP-сервера")
-	flag.StringVar(&cfg.ShortBaseUrl, "b", "http://localhost:8080/", "базовый адрес результирующего сокращённого URL")
+	flag.StringVar(&rawShortBaseURL, "b", "http://localhost:8080/", "базовый адрес результирующего сокращённого URL")
 	flag.StringVar(&cfg.StoragePath, "f", "storage.json", "путь к файлу для сохранения сайтов")
 	flag.StringVar(&cfg.DataBaseDSN, "d", "", "параметры подключения к БД")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "audit.json", "путь к файлу-приёмнику логов аудита")
@@ -35,7 +35,7 @@ func ParseFlags() *Config {
 		cfg.ServerAddress = envServerAddress
 	}
 	if envBaseUrl := os.Getenv("BASE_URL"); envBaseUrl != "" {
-		cfg.ShortBaseUrl = envBaseUrl
+		rawShortBaseURL = envBaseUrl
 	}
 	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
 		cfg.StoragePath = envStoragePath
@@ -52,7 +52,13 @@ func ParseFlags() *Config {
 
 	// Нормализация и автоподстановка схемы
 	cfg.AuditURL = normalizeURL(cfg.AuditURL)
-	cfg.ShortBaseUrl = normalizeURL(cfg.ShortBaseUrl)
+
+	var err error
+
+	cfg.ShortBaseUrl, err = url.Parse(normalizeURL(rawShortBaseURL))
+	if err != nil {
+		panic("invalid base URL: " + err.Error())
+	}
 
 	return cfg
 }
@@ -72,13 +78,8 @@ func normalizeURL(rawURL string) string {
 		rawURL = "http://" + rawURL
 	}
 
-	// Дополнительно проверяем, что получившийся URL синтаксически корректен
-	_, err := url.ParseRequestURI(rawURL)
-	if err != nil {
-		// Если это совсем нечитаемый мусор, возвращаем как есть,
-		// чтобы вызывающий сетевой компонент штатно вернул понятную ошибку парсинга.
-		return rawURL
-	}
+	// Гарантируем отсутствие слэша на конце для будущих хэндлеров
+	rawURL = strings.TrimSuffix(rawURL, "/")
 
 	return rawURL
 }

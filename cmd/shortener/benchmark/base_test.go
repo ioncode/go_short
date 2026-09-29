@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 
@@ -33,9 +34,11 @@ type BenchEnv struct {
 
 func initBenchEnv(b *testing.B) BenchEnv {
 	ctx := context.Background()
+
+	shortBaseUrl, _ := url.Parse("http://localhost:8080/")
 	cfg := &config.Config{
 		ServerAddress: ":8080",
-		ShortBaseUrl:  "http://localhost:8080/",
+		ShortBaseUrl:  shortBaseUrl,
 		StoragePath:   "", // Чистая RAM
 	}
 

@@ -1,13 +1,14 @@
 package pkg
 
 import (
-	"compress/gzip"
 	"errors"
 	"io"
 	"mime"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/klauspost/compress/gzip"
 
 	"github.com/ioncode/go_short/internal/logger"
 	"go.uber.org/zap"

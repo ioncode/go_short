@@ -75,3 +75,43 @@ func Benchmark_E2E_DeleteUserSites(b *testing.B) {
 		benchSink = res
 	}
 }
+
+// новый бенчмарк параллельной работы удаления, вне контекста E2E
+func Benchmark_DeleteUserSitesParallel(b *testing.B) {
+	env := initBenchEnv(b)
+
+	b.ResetTimer()
+	// Запускаем тест параллельно на всех 12 потоках процессора Ryzen 5 5600X
+	b.RunParallel(func(pb *testing.PB) {
+		var counter uint64
+		rawBuf := make([]byte, 0, 128)
+		bodyReader := bytes.NewReader(nil)
+		res := httptest.NewRecorder()
+
+		for pb.Next() {
+			counter++
+			resetRecorder(res)
+			rawBuf = generateDeleteJSON(rawBuf, counter)
+			bodyReader.Reset(rawBuf)
+
+			req, _ := http.NewRequestWithContext(env.Ctx, http.MethodDelete, "/api/user/urls", bodyReader)
+			req.Header.Set("Content-Type", "application/json")
+			if env.Cookie != nil {
+				req.AddCookie(env.Cookie)
+			}
+
+			// Несколько параллельных потоков начнут одновременно вызывать ServeHTTP
+			env.Router.ServeHTTP(res, req)
+
+			respResult := res.Result()
+			respResult.Body.Close()
+
+			// Хендлер по спецификации должен возвращать статус 202 Accepted
+			if respResult.StatusCode != http.StatusAccepted {
+				b.Fatalf("Ожидался статус 202 Accepted, получен %d. Ответ: %s", respResult.StatusCode, res.Body.String())
+			}
+
+			benchSink = res
+		}
+	})
+}

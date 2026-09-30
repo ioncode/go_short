@@ -8,10 +8,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/ioncode/httpcodec"
 )
 
 func Test_middleware(t *testing.T) {
-
+	codec := httpcodec.New(7000)
 	responseContentTypeHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%#v\n", r.Header)
 		log.Printf("%#v\n", w)
@@ -76,7 +78,8 @@ func Test_middleware(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/", tt.body)
 			req.Header.Set("Content-type", tt.contentType)
 			rec := httptest.NewRecorder()
-			middleware := requestContentLengthMiddleware(corsMiddleware(tt.next))
+			mw := codec.Middleware()
+			middleware := mw(corsMiddleware(tt.next))
 			middleware.ServeHTTP(rec, req)
 			res := rec.Result()
 			defer res.Body.Close()

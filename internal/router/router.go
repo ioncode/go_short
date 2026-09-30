@@ -23,6 +23,7 @@ import (
 	"github.com/ioncode/go_short/internal/router/audit/remote"
 	"github.com/ioncode/go_short/internal/service"
 	"github.com/ioncode/go_short/pkg"
+	"github.com/ioncode/httpcodec"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
@@ -32,13 +33,6 @@ import (
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		next.ServeHTTP(w, r)
-	})
-}
-
-func requestContentLengthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, 7000)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -162,13 +156,42 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 		}
 	}
 
-	router := chi.NewRouter().With(pkg.GzipMiddleware, requestContentLengthMiddleware, corsMiddleware, authMiddleware.EnsureUserHasID)
+	// 1. Инициализируем кодек v0.0.4 через Functional Options.
+	// Выставляем жесткий лимит входящего тела в 8 КБ (8192 байта) для защиты от OOM.
+	// Настраиваем лимиты очистки мусора Keep-Alive сокетов и капы буферов ответов.
+	codec := httpcodec.New(
+		8192,
+		httpcodec.WithMaxTrashRead(64*1024), // Очистка до 64 КБ для сохранения Keep-Alive сессий
+		httpcodec.WithInitJSONBufferCap(4*1024),  // Старт буфера ответа с 4 КБ
+		httpcodec.WithMaxJSONBufferCap(256*1024), // Защита от OOM: жесткий лимит буфера ответа 256 КБ
+	)
+
+	// 2. Собираем базовую цепочку Middleware.
+	// codec.Middleware() автоматически синхронизирует MaxBytesReader сокета под лимит 8 КБ
+	router := chi.NewRouter().With(
+		pkg.GzipMiddleware,
+		corsMiddleware,
+		codec.Middleware(), // Автоматическая DoS-защита периметра на уровне сокета
+		authMiddleware.EnsureUserHasID,
+	)
+	// 3. Регистрируем эндпоинты и пробрасываем кодек как зависимость во все POST-фабрики
 	router.With(auditor.Middleware).Get("/{alias}", handler.Get(service))
 	router.Get("/ping", handler.Ping(repo))
-	router.With(chiMiddleware.AllowContentType("text/plain"), auditor.Middleware).Post("/", handler.Post(service, config.ShortBaseUrl))
-	router.With(chiMiddleware.AllowContentType("application/json"), auditor.Middleware).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl))
-	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten/batch", handler.APIPostBatch(service, config.ShortBaseUrl))
-	router.Get("/api/user/urls", handler.GetUserSites(service, config.ShortBaseUrl))
-	router.Delete("/api/user/urls", handler.AsyncDeleteUserSites(service))
+
+	// Текстовый эндпоинт (Вход: text/plain, Выход: text/plain)
+	router.With(chiMiddleware.AllowContentType("text/plain"), auditor.Middleware).Post("/", handler.Post(service, config.ShortBaseUrl, codec))
+
+	// Одиночный REST API эндпоинт (Вход: JSON, Выход: JSON)
+	router.With(chiMiddleware.AllowContentType("application/json"), auditor.Middleware).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl, codec))
+
+	// Пакетный REST API эндпоинт батчей (Вход: JSON-массив, Выход: JSON-массив)
+	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten/batch", handler.APIPostBatch(service, config.ShortBaseUrl, codec))
+
+	// Список сайтов пользователя (Выход: JSON-массив)
+	router.Get("/api/user/urls", handler.GetUserSites(service, config.ShortBaseUrl, codec))
+
+	// запрос на пакетное удаление ссылок пользователя (Вход: JSON-массив, Выход: JSON-ошибка авторизации или заголовк 202)
+	router.Delete("/api/user/urls", handler.AsyncDeleteUserSites(service, codec))
+
 	return router, repo, auditor
 }

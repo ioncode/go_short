@@ -14,6 +14,7 @@ import (
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/pkg"
+	"github.com/ioncode/httpcodec"
 )
 
 type MockService struct {
@@ -56,7 +57,13 @@ func TestPost(t *testing.T) {
 				MockShort: tt.mockBehavior,
 			}
 			bu, _ := url.Parse("http://localhost:8080/")
-			handler := handler.Post(service, bu)
+			codec := httpcodec.New(
+				8192,
+				httpcodec.WithMaxTrashRead(64*1024), // Очистка до 64 КБ для сохранения Keep-Alive сессий
+				httpcodec.WithInitJSONBufferCap(4*1024),  // Старт буфера ответа с 4 КБ
+				httpcodec.WithMaxJSONBufferCap(256*1024), // Защита от OOM: жесткий лимит буфера ответа 256 КБ
+			)
+			handler := handler.Post(service, bu, codec)
 			ctx := pkg.WithUser(context.Background(), &model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
 			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()

@@ -81,7 +81,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // TestRemoteObserver_Lifecycle_Synctest сквозным образом тестирует всю стейт-машину
 // предохранителя, логику сетевых задержек (Backoff) и побайтовое содержимое JSON
-// в изолированном пространстве виртуального времени Go 1.26.1.
+// в изолированном пространстве виртуального времени.
 func TestRemoteObserver_Lifecycle_Synctest(t *testing.T) {
 	logger := zap.NewNop()
 	observer, err := NewRemoteObserver("http://mock-target.local", logger)

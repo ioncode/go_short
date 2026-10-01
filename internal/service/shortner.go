@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
 )
@@ -45,7 +46,7 @@ type SiteRepository interface {
 	Ping(ctx context.Context) error
 	Close() error
 	BatchStoreSites(sites []model.Site) error
-	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
+	GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error)
 	Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error
 }
 
@@ -173,8 +174,8 @@ func (s *Shortner) BatchShort(items []model.BatchPostRequestItem, user model.Use
 	return responseItems, err
 }
 
-func (s *Shortner) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
-	return s.repository.GetByUser(userId)
+func (s *Shortner) GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error) {
+	return s.repository.GetByUser(authorID)
 }
 
 func (s *Shortner) deleteWorker(workerID int) {

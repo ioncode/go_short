@@ -2,6 +2,9 @@ package pkg
 
 import (
 	"errors"
+	"log"
+
+	"github.com/google/uuid"
 )
 
 // StringCodec реализует интерфейс securecookie.Serializer.
@@ -13,6 +16,7 @@ type StringCodec struct{}
 func (StringCodec) Serialize(src any) ([]byte, error) {
 	str, ok := src.(string)
 	if !ok {
+		log.Println(src)
 		return nil, errors.New("securecookie: кодек поддерживает только плоские строки")
 	}
 	// Преобразуем строку в байты без использования внешних маршалеров
@@ -27,5 +31,39 @@ func (StringCodec) Deserialize(src []byte, dst any) error {
 	}
 	// Записываем чистую строку напрямую по переданному указателю
 	*ptr = string(src)
+	return nil
+}
+
+// UUIDCodec реализует интерфейс securecookie.Serializer.
+// Он предназначен для сверхбыстрой сериализации бинарных UUID
+// без аллокаций памяти и использования рефлексии.
+type UUIDCodec struct{}
+
+// Serialize преобразует входящий uuid.UUID в сырой срез байт.
+func (UUIDCodec) Serialize(src any) ([]byte, error) {
+	id, ok := src.(uuid.UUID)
+	if !ok {
+		return nil, errors.New("securecookie: кодек поддерживает только тип uuid.UUID")
+	}
+
+	// uuid.UUID — это [16]byte. Слайсим массив, чтобы вернуть []byte.
+	// Операция среза массива не создает аллокаций в куче!
+	return id[:], nil
+}
+
+// Deserialize считывает сырые 16 байт из куки и записывает их напрямую в uuid.UUID.
+func (UUIDCodec) Deserialize(src []byte, dst any) error {
+	ptr, ok := dst.(*uuid.UUID)
+	if !ok {
+		return errors.New("securecookie: целевой объект должен быть указателем на uuid.UUID")
+	}
+
+	// Валидируем длину байтового среза UUID
+	if len(src) != 16 {
+		return errors.New("securecookie: неверная длина бинарного UUID")
+	}
+
+	// Копируем 16 байт напрямую в память по указателю
+	copy(ptr[:], src)
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/pkg"
 )
 
@@ -59,7 +60,7 @@ func (a *Auditor) Middleware(next http.Handler) http.Handler {
 
 		// Фильтруем по статус-кодам
 		if wrapper.statusCode >= 200 && wrapper.statusCode < 400 {
-			var userID string
+			var userID uuid.UUID
 			if user, err := pkg.UserFromContext(r.Context()); err == nil && user != nil {
 				userID = user.ID
 			}

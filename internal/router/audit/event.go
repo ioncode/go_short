@@ -5,6 +5,8 @@ package audit
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 // Action определяет тип действия, совершенного пользователем.
@@ -35,7 +37,7 @@ type Event struct {
 
 	// UserID содержит идентификатор пользователя, извлеченный из контекста запроса.
 	// Если пользователь анонимен или не был определен, поле не передается при парсинге в JSON.
-	UserID string `json:"user_id,omitempty"`
+	UserID uuid.UUID `json:"user_id,omitempty"`
 
 	// Action указывает тип совершенного действия.
 	Action Action `json:"action"`

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	json "github.com/goccy/go-json"
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/router/audit"
 	"go.uber.org/zap"
 )
@@ -92,7 +93,7 @@ func TestRemoteObserver_Lifecycle_Synctest(t *testing.T) {
 	// Инициализируем тестовое событие с полями, которые ДОЛЖНЫ и НЕ ДОЛЖНЫ улететь в сеть
 	event := audit.Event{
 		TS:         time.Now().Unix(),
-		UserID:     "user_test_123",
+		UserID:     uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"),
 		Action:     "shorten",
 		URL:        "https://example.com",
 		Method:     "POST",         // json:"-"

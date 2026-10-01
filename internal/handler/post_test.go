@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/model"
@@ -64,7 +65,8 @@ func TestPost(t *testing.T) {
 				httpcodec.WithMaxJSONBufferCap(256*1024), // Защита от OOM: жесткий лимит буфера ответа 256 КБ
 			)
 			handler := handler.Post(service, bu, codec)
-			ctx := pkg.WithUser(context.Background(), &model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
+
+			ctx := pkg.WithUser(context.Background(), &model.User{ID: uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e")})
 			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)

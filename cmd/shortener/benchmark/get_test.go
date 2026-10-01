@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 )
 
@@ -49,7 +50,7 @@ func Benchmark_E2E_Get_Alias(b *testing.B) {
 func Benchmark_E2E_GetUserSites(b *testing.B) {
 	env := initBenchEnv(b)
 
-	if env.UserID == "" {
+	if env.UserID == uuid.Nil {
 		b.Fatal("критическая ошибка: UserId не был инициализирован")
 	}
 

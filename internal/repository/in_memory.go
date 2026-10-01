@@ -10,6 +10,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 )
 
@@ -29,7 +30,7 @@ var (
 type MapRepository struct {
 	sites    map[model.ShortUrl]*model.Site // Индекс для быстрого поиска по короткому алиасу (O(1))
 	urls     map[model.Url]*model.Site      // Индекс для мгновенной проверки уникальности оригинального URL (O(1))
-	userUrls map[string][]model.ShortUrl    // Индекс для мгновенного получения ссылок конкретного пользователя (O(1))
+	userUrls map[uuid.UUID][]model.ShortUrl // Индекс для мгновенного получения ссылок конкретного пользователя (O(1))
 	mutex    sync.RWMutex                   // RWMutex для безопасного конкурентного доступа к мапам
 	file     *os.File                       // Дескриптор файла для персистентного хранения данных на диске
 }
@@ -50,7 +51,7 @@ func NewMapRepository(storagePath string) *MapRepository {
 		return &MapRepository{
 			sites:    make(map[model.ShortUrl]*model.Site, initialCapacity),
 			urls:     make(map[model.Url]*model.Site, initialCapacity),
-			userUrls: make(map[string][]model.ShortUrl),
+			userUrls: make(map[uuid.UUID][]model.ShortUrl),
 			file:     nil,
 		}
 	}
@@ -63,7 +64,7 @@ func NewMapRepository(storagePath string) *MapRepository {
 	repository := MapRepository{
 		sites:    make(map[model.ShortUrl]*model.Site),
 		urls:     make(map[model.Url]*model.Site),
-		userUrls: make(map[string][]model.ShortUrl),
+		userUrls: make(map[uuid.UUID][]model.ShortUrl),
 		file:     file,
 	}
 
@@ -247,11 +248,11 @@ func (r *MapRepository) Ping(ctx context.Context) error {
 // БЫЛО: Линейный поиск O(N), который сканировал всю базу данных при каждом запросе.
 // СТАЛО: Извлечение готового среза альясов из индекса r.userUrls за O(1).
 // Если у пользователя нет ссылок, метод возвращает (nil, nil) без аллокаций памяти.
-func (r *MapRepository) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+func (r *MapRepository) GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error) {
 	r.mutex.RLock() // Разрешаем параллельное конкурентное чтение
 	defer r.mutex.RUnlock()
 
-	aliases, ok := r.userUrls[userId]
+	aliases, ok := r.userUrls[authorID]
 	if !ok || len(aliases) == 0 {
 		return nil, nil // 0 аллокаций памяти при отсутствии данных у пользователя
 	}

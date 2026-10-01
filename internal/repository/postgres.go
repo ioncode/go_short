@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -67,14 +68,14 @@ func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
 	return site, nil
 }
 
-func (r *PostgresSitesRepository) GetByUser(userId string) ([]model.UserSitesResponseItem, error) {
+func (r *PostgresSitesRepository) GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	records := []model.UserSitesResponseItem{}
 
 	query := `SELECT url, short_url FROM sites WHERE user_id = $1`
-	rows, err := r.db.QueryContext(ctx, query, userId)
+	rows, err := r.db.QueryContext(ctx, query, authorID)
 	if err != nil {
 		return records, err
 	}

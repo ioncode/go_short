@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/router"
@@ -29,7 +30,7 @@ type BenchEnv struct {
 	Router http.Handler
 	Repo   service.SiteRepository
 	Cookie *http.Cookie
-	UserID string
+	UserID uuid.UUID
 }
 
 func initBenchEnv(b *testing.B) BenchEnv {
@@ -63,7 +64,7 @@ func initBenchEnv(b *testing.B) BenchEnv {
 		}
 	}
 
-	var userID string
+	var userID uuid.UUID
 	if site, err := repo.GetByUrl(model.Url(warmupURL)); err == nil {
 		userID = site.UserId
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/router/audit"
 	"go.uber.org/zap"
 )
@@ -36,7 +37,7 @@ func BenchmarkRemoteObserver_SingleThread(b *testing.B) {
 
 	event := audit.Event{
 		TS:         time.Now().Unix(),
-		UserID:     "benchmark-user-999",
+		UserID:     uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"),
 		Action:     "shorten",
 		URL:        "https://some-very-long-and-complex-url-to-stress-test-json-marshaler.com",
 		Method:     "POST",
@@ -66,7 +67,7 @@ func BenchmarkRemoteObserver_Parallel(b *testing.B) {
 
 	event := audit.Event{
 		TS:         time.Now().Unix(),
-		UserID:     "benchmark-user-999",
+		UserID:     uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"),
 		Action:     "follow",
 		URL:        "https://example.com",
 		Method:     "GET",

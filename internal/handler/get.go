@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/router/audit"
 	"github.com/ioncode/go_short/pkg"
@@ -41,7 +42,7 @@ func Get(s GetService) http.HandlerFunc {
 
 // GetByUser определяет интерфейс для получения списка всех сайтов конкретного пользователя.
 type GetByUser interface {
-	GetByUser(userId string) ([]model.UserSitesResponseItem, error)
+	GetByUser(userId uuid.UUID) ([]model.UserSitesResponseItem, error)
 }
 
 // GetUserSites возвращает JSON-список всех сокращенных ссылок авторизованного пользователя.
@@ -53,7 +54,6 @@ func GetUserSites(s GetByUser, shortBaseURL *url.URL, codec *httpcodec.Codec) ht
 	return func(res http.ResponseWriter, req *http.Request) {
 		user, err := pkg.UserFromContext(req.Context())
 		if err != nil {
-			// ИСПРАВЛЕНО: Возвращаем JSON-ошибку авторизации через пулы кодека вместо text/plain
 			writeJSONError(res, "Ошибка авторизации", http.StatusUnauthorized, codec)
 			return
 		}

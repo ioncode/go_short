@@ -3,6 +3,7 @@ package pkg
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -49,7 +50,7 @@ func NewAuthMiddleware(sc *securecookie.SecureCookie) *AuthMiddleware {
 // EnsureUserHasID проверяет подписанную куку. Если её нет или подпись невалидна — генерирует новый ID.
 func (am *AuthMiddleware) EnsureUserHasID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var userID string
+		var userID uuid.UUID
 		var needsNewCookie bool
 
 		// 1. Пытаемся прочитать существующую куку
@@ -73,9 +74,11 @@ func (am *AuthMiddleware) EnsureUserHasID(next http.Handler) http.Handler {
 			needsNewCookie = true
 		}
 
+		log.Println(needsNewCookie)
+
 		// 3. Если куки не было или она была "битой" — создаем заново
 		if needsNewCookie {
-			userID = uuid.New().String()
+			userID = uuid.New()
 
 			// Кодируем userID и подписываем его секретным ключом
 			encoded, err := am.sc.Encode(cookieName, userID)

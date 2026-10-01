@@ -8,6 +8,7 @@ import (
 	"time"
 
 	json "github.com/goccy/go-json"
+	"github.com/google/uuid"
 
 	"go.uber.org/zap"
 )
@@ -30,7 +31,7 @@ func TestFileObserver_Success(t *testing.T) {
 	// 3. Формируем тестовое событие
 	event := Event{
 		TS:         time.Now().Unix(),
-		UserID:     "user-456",
+		UserID:     uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"),
 		Action:     ActionShorten,
 		URL:        "https://example.com",
 		Method:     "POST",
@@ -116,7 +117,7 @@ func BenchmarkFileObserver_SingleThread(b *testing.B) {
 
 	event := Event{
 		TS:         time.Now().Unix(),
-		UserID:     "benchmark-user-111",
+		UserID:     uuid.New(),
 		Action:     ActionShorten,
 		URL:        "https://example.com",
 		Method:     "POST",
@@ -145,7 +146,7 @@ func BenchmarkFileObserver_Parallel(b *testing.B) {
 
 	event := Event{
 		TS:         time.Now().Unix(),
-		UserID:     "benchmark-user-222",
+		UserID:     uuid.New(),
 		Action:     ActionFollow,
 		URL:        "https://example.com",
 		Method:     "GET",

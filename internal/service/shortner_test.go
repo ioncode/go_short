@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/service"
@@ -43,7 +44,7 @@ func TestMapShortner_Short(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := service.NewShortner(tt.r)
-			got, gotErr := s.Short(tt.Url, model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
+			got, gotErr := s.Short(tt.Url, model.User{ID: uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e")})
 			if gotErr != nil && !errors.Is(gotErr, repository.ErrSiteExists) {
 				if !tt.wantErr {
 					t.Errorf("Short() failed: %v", gotErr)

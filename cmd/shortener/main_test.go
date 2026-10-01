@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
@@ -19,10 +20,10 @@ import (
 
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
-
-	router, repo := router.SetupRouter(config.Config{
+	shortBaseUrl, _ := url.Parse("http://localhost:8080/")
+	router, repo, _ := router.SetupRouter(context.Background(), &config.Config{
 		ServerAddress: ":8080",
-		ShortBaseUrl:  "http://localhost:8080/",
+		ShortBaseUrl:  shortBaseUrl,
 		StoragePath:   "test_storage.json",
 	})
 	srv := httptest.NewServer(router)
@@ -45,7 +46,6 @@ func Test_main(t *testing.T) {
 	assert.NoError(t, err, "error making HTTP request for store site")
 	body := string(resp.Body())
 	alias := body[len(body)-8:]
-	log.Println(alias)
 
 	tests := []struct {
 		name                    string
@@ -167,7 +167,6 @@ func Test_main(t *testing.T) {
 				req.SetHeader("Accept-Encoding", tt.expectedContentEncoding)
 			}
 			req.URL = srv.URL + tt.path
-			log.Println("Performing resty request to URL", req.URL)
 
 			resp, err := req.Send()
 			defer resp.RawBody().Close()
@@ -196,10 +195,8 @@ func Test_main(t *testing.T) {
 				defer gzipReader.Close()
 				unzippedData, err := io.ReadAll(gzipReader)
 				assert.NoError(t, err, "error reading unGzipped data")
-				log.Println("Decommpressed response data", string(unzippedData))
 				assert.Equal(t, tt.expectedBody, string(unzippedData))
 			} else if tt.expectedBody != "" {
-				log.Println("Resp status", resp.StatusCode(), req.Header, resp.RawResponse, resp.Body())
 				assert.Equal(t, tt.expectedBody, string(resp.Body()))
 			}
 		})

@@ -1,13 +1,30 @@
 package pkg
 
 import (
-	"compress/gzip"
+	"errors"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"strings"
+	"sync"
+
+	"github.com/klauspost/compress/gzip"
+
+	"github.com/ioncode/go_short/internal/logger"
+	"go.uber.org/zap"
 )
+
+var writerPool = sync.Pool{
+	New: func() any {
+		return gzip.NewWriter(io.Discard)
+	},
+}
+
+var readerPool = sync.Pool{
+	New: func() any {
+		return &gzip.Reader{}
+	},
+}
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера
 // сжимать передаваемые данные и выставлять правильные HTTP-заголовки
@@ -17,9 +34,11 @@ type compressWriter struct {
 }
 
 func newCompressWriter(w http.ResponseWriter) *compressWriter {
+	zw := writerPool.Get().(*gzip.Writer)
+	zw.Reset(w)
 	return &compressWriter{
 		w:  w,
-		zw: gzip.NewWriter(w),
+		zw: zw,
 	}
 }
 
@@ -40,7 +59,10 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 
 // Close закрывает gzip.Writer и досылает все данные из буфера.
 func (c *compressWriter) Close() error {
-	return c.zw.Close()
+	err := c.zw.Close()
+	c.zw.Reset(io.Discard)
+	writerPool.Put(c.zw)
+	return err
 }
 
 // compressReader реализует интерфейс io.ReadCloser и позволяет прозрачно для сервера
@@ -50,9 +72,21 @@ type compressReader struct {
 	zr *gzip.Reader
 }
 
+// newCompressReader извлекает готовый gzip.Reader из пула памяти readerPool
+// и инициализирует его под текущий io.ReadCloser (тело запроса) с помощью Reset.
+// Это полностью предотвращает аллокации flate.NewReader в куче на каждый входящий запрос.
 func newCompressReader(r io.ReadCloser) (*compressReader, error) {
-	zr, err := gzip.NewReader(r)
+	// 1. Достаем свободный декомпрессор из sync.Pool
+	zr := readerPool.Get().(*gzip.Reader)
+
+	// 2. Сбрасываем его состояние и прикладываем к текущему входящему потоку.
+	// Если это первый запуск структуры из пула (ее внутренний ридер nil),
+	// gzip.NewReader(r) инициализирует ее, иначе Reset подменит сокет за 0 аллокаций.
+	err := zr.Reset(r)
 	if err != nil {
+		// В случае ошибки (например, битый заголовок gzip) возвращаем ридер обратно в пул,
+		// чтобы избежать утечки ресурсов из пула памяти.
+		readerPool.Put(zr)
 		return nil, err
 	}
 
@@ -66,11 +100,24 @@ func (c compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
+// Close закрывает входящие сетевые потоки и возвращает декомпрессор в пул.
 func (c *compressReader) Close() error {
-	if err := c.r.Close(); err != nil {
-		return err
+	// 1. Закрываем оригинальный сетевой поток тела запроса (req.Body)
+	err := c.r.Close()
+
+	// 2. Закрываем внутренний декомпрессор gzip
+	if zrErr := c.zr.Close(); zrErr != nil {
+		err = errors.Join(err, zrErr)
 	}
-	return c.zr.Close()
+
+	// 3. Зануляем ссылку на входящий поток внутри gzip.Reader,
+	// чтобы разорвать связь с закрытым сокетом и дать GC очистить его метаданные.
+	_ = c.zr.Reset(io.NopCloser(strings.NewReader("")))
+
+	// 4. Возвращаем чистый декомпрессор в пул для использования другими горутинами
+	readerPool.Put(c.zr)
+
+	return err
 }
 
 func GzipMiddleware(next http.Handler) http.Handler {
@@ -84,7 +131,9 @@ func GzipMiddleware(next http.Handler) http.Handler {
 		contentType := r.Header.Get("Content-Type")
 		mediaType, _, err := mime.ParseMediaType(contentType)
 		if err != nil {
-			log.Println("Error parsing mediatype from content type", contentType, r.Header)
+			logger.Log.Debug("Error parsing mediatype from content type",
+				zap.String("content_type", contentType),
+			)
 			//http.Error(w, "Invalid Content-Type header", http.StatusBadRequest)
 			//return
 		}
@@ -109,7 +158,9 @@ func GzipMiddleware(next http.Handler) http.Handler {
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				log.Println("Error creating gzip compressor", err)
+				logger.Log.Error("Error creating gzip compressor",
+					zap.Error(err),
+				)
 				return
 			}
 			// меняем тело запроса на новое

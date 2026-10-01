@@ -1,7 +1,6 @@
 package repository_test
 
 import (
-	"log"
 	"os"
 	"testing"
 
@@ -39,7 +38,6 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				log.Println("CleanUp test get by url")
 				r.Close()
 				os.RemoveAll("test_storage.json")
 			})
@@ -91,7 +89,6 @@ func TestMapRepository_GetByAlias(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				log.Println("CleanUp test get by alias")
 				r.Close()
 				os.RemoveAll("test_storage.json")
 			})
@@ -142,7 +139,6 @@ func TestMapRepository_StoreSite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				log.Println("CleanUp test store site")
 				r.Close()
 				os.RemoveAll("test_storage.json")
 			})
@@ -151,7 +147,7 @@ func TestMapRepository_StoreSite(t *testing.T) {
 				ShortUrl: "sfdsfgd",
 			})
 
-			gotErr := r.StoreSite(tt.site)
+			_, gotErr := r.StoreSite(tt.site)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("StoreSite() failed: %v", gotErr)

@@ -8,16 +8,18 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/ioncode/httpcodec"
 )
 
 func Test_middleware(t *testing.T) {
-
+	codec := httpcodec.New(7000)
 	responseContentTypeHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%#v\n", r.Header)
 		log.Printf("%#v\n", w)
-		contentType := w.Header().Get("Content-type")
-		if contentType != "text/plain" {
-			t.Error("Content type not correct:", contentType)
+		cors := w.Header().Get("Access-Control-Allow-Origin")
+		if cors != "*" {
+			t.Error("CORS headers not correct:", cors)
 		}
 		_, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -34,7 +36,7 @@ func Test_middleware(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		next           http.Handler // we can keep dynamic parameter, but now use only static responseContentTypeHandler for current middleware implementation
+		next           http.Handler
 		method         string
 		expectedStatus int
 		body           io.Reader
@@ -45,9 +47,9 @@ func Test_middleware(t *testing.T) {
 			next: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				log.Printf("%#v\n", r.Header)
 				log.Printf("%#v\n", w)
-				contentType := w.Header().Get("Content-type")
-				if contentType != "text/plain" {
-					t.Error("Content type not correct:", contentType)
+				cors := w.Header().Get("Access-Control-Allow-Origin")
+				if cors != "*" {
+					t.Error("CORS headers not correct:", cors)
 				}
 			}),
 			expectedStatus: http.StatusOK,
@@ -76,7 +78,8 @@ func Test_middleware(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/", tt.body)
 			req.Header.Set("Content-type", tt.contentType)
 			rec := httptest.NewRecorder()
-			middleware := requestContentLengthMiddleware(responseHeadersMiddleware(tt.next))
+			mw := codec.Middleware()
+			middleware := mw(corsMiddleware(tt.next))
 			middleware.ServeHTTP(rec, req)
 			res := rec.Result()
 			defer res.Body.Close()

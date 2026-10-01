@@ -3,7 +3,6 @@ package pkg
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"time"
 
@@ -73,8 +72,6 @@ func (am *AuthMiddleware) EnsureUserHasID(next http.Handler) http.Handler {
 			// Куки вообще не было
 			needsNewCookie = true
 		}
-
-		log.Println(needsNewCookie)
 
 		// 3. Если куки не было или она была "битой" — создаем заново
 		if needsNewCookie {

@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"errors"
-	"log"
 
 	"github.com/google/uuid"
 )
@@ -16,7 +15,6 @@ type StringCodec struct{}
 func (StringCodec) Serialize(src any) ([]byte, error) {
 	str, ok := src.(string)
 	if !ok {
-		log.Println(src)
 		return nil, errors.New("securecookie: кодек поддерживает только плоские строки")
 	}
 	// Преобразуем строку в байты без использования внешних маршалеров

@@ -9,9 +9,14 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 
 	"go.uber.org/zap"
 )
+
+func ptr[T any](v T) *T {
+	return &v
+}
 
 // TestFileObserver_Success проверяет штатный сценарий создания логгера,
 // асинхронной записи события и корректной структуры JSON на диске.
@@ -31,7 +36,7 @@ func TestFileObserver_Success(t *testing.T) {
 	// 3. Формируем тестовое событие
 	event := Event{
 		TS:         time.Now().Unix(),
-		UserID:     uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"),
+		UserID:     ptr(uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e")),
 		Action:     ActionShorten,
 		URL:        "https://example.com",
 		Method:     "POST",
@@ -63,9 +68,8 @@ func TestFileObserver_Success(t *testing.T) {
 	if readEvent.TS != event.TS {
 		t.Errorf("Таймстемпы не совпадают. Ожидалось %d, получено %d", event.TS, readEvent.TS)
 	}
-	if readEvent.UserID != event.UserID {
-		t.Errorf("UserID не совпадает. Ожидалось %s, получено %s", event.UserID, readEvent.UserID)
-	}
+	assert.Equal(t, readEvent.UserID, event.UserID)
+
 	if readEvent.Action != event.Action {
 		t.Errorf("Action не совпадает. Ожидалось %s, получено %s", event.Action, readEvent.Action)
 	}
@@ -117,7 +121,7 @@ func BenchmarkFileObserver_SingleThread(b *testing.B) {
 
 	event := Event{
 		TS:         time.Now().Unix(),
-		UserID:     uuid.New(),
+		UserID:     ptr(uuid.New()),
 		Action:     ActionShorten,
 		URL:        "https://example.com",
 		Method:     "POST",
@@ -146,7 +150,7 @@ func BenchmarkFileObserver_Parallel(b *testing.B) {
 
 	event := Event{
 		TS:         time.Now().Unix(),
-		UserID:     uuid.New(),
+		UserID:     new(uuid.UUID),
 		Action:     ActionFollow,
 		URL:        "https://example.com",
 		Method:     "GET",

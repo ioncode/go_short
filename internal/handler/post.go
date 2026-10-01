@@ -7,8 +7,8 @@ import (
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
-	"github.com/ioncode/go_short/internal/router/audit"
 	"github.com/ioncode/go_short/pkg"
+	"github.com/ioncode/go_short/pkg/http/audit"
 	"github.com/ioncode/httpcodec"
 )
 

@@ -12,7 +12,9 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/google/uuid"
-	"github.com/ioncode/go_short/internal/router/audit"
+	"github.com/ioncode/go_short/pkg/http/audit"
+	"github.com/stretchr/testify/assert"
+
 	"go.uber.org/zap"
 )
 
@@ -72,13 +74,13 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if actualEvent.URL != m.expectedEvent.URL {
 		m.t.Errorf("Несовпадение URL. Ожидалось: %s, получено: %s", m.expectedEvent.URL, actualEvent.URL)
 	}
-	if actualEvent.UserID != m.expectedEvent.UserID {
-		m.t.Errorf("Несовпадение UserID. Ожидалось: %s, получено: %s", m.expectedEvent.UserID, actualEvent.UserID)
-	}
+	assert.Equal(m.t, actualEvent.UserID, m.expectedEvent.UserID)
 
 	// Вызываем кастомное поведение (успех или симуляция ошибки сети)
 	return m.roundTripFunc(req)
 }
+
+func ptr[T any](v T) *T { return &v }
 
 // TestRemoteObserver_Lifecycle_Synctest сквозным образом тестирует всю стейт-машину
 // предохранителя, логику сетевых задержек (Backoff) и побайтовое содержимое JSON
@@ -93,7 +95,7 @@ func TestRemoteObserver_Lifecycle_Synctest(t *testing.T) {
 	// Инициализируем тестовое событие с полями, которые ДОЛЖНЫ и НЕ ДОЛЖНЫ улететь в сеть
 	event := audit.Event{
 		TS:         time.Now().Unix(),
-		UserID:     uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"),
+		UserID:     ptr(uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e")),
 		Action:     "shorten",
 		URL:        "https://example.com",
 		Method:     "POST",         // json:"-"

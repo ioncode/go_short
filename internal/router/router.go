@@ -19,10 +19,11 @@ import (
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/logger"
 	"github.com/ioncode/go_short/internal/repository"
-	"github.com/ioncode/go_short/internal/router/audit"
-	"github.com/ioncode/go_short/internal/router/audit/remote"
 	"github.com/ioncode/go_short/internal/service"
 	"github.com/ioncode/go_short/pkg"
+	"github.com/ioncode/go_short/pkg/http/audit"
+	"github.com/ioncode/go_short/pkg/http/audit/remote"
+	"github.com/ioncode/go_short/pkg/http/request/payload"
 	"github.com/ioncode/httpcodec"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -169,6 +170,7 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 	// 2. Собираем базовую цепочку Middleware.
 	// codec.Middleware() автоматически синхронизирует MaxBytesReader сокета под лимит 8 КБ
 	router := chi.NewRouter().With(
+		payload.Middleware,
 		pkg.GzipMiddleware,
 		corsMiddleware,
 		codec.Middleware(), // Автоматическая DoS-защита периметра на уровне сокета

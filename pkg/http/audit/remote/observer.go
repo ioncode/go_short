@@ -6,7 +6,8 @@ import (
 	"time"
 
 	json "github.com/goccy/go-json"
-	"github.com/ioncode/go_short/internal/router/audit"
+	"github.com/ioncode/go_short/pkg/http/audit"
+
 	"go.uber.org/zap"
 )
 

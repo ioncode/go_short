@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/pkg/http/audit"
+	"github.com/ioncode/go_short/pkg/http/auth"
 
-	"github.com/ioncode/go_short/pkg"
 	"github.com/ioncode/httpcodec"
 )
 
@@ -53,13 +53,13 @@ type GetByUser interface {
 // Использование jsonPool библиотеки полностью обнуляет накладные расходы на маршалинг ответа.
 func GetUserSites(s GetByUser, shortBaseURL *url.URL, codec *httpcodec.Codec) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		user, err := pkg.UserFromContext(req.Context())
+		userID, err := auth.UserIDFromContext(req.Context())
 		if err != nil {
 			writeJSONError(res, "Ошибка авторизации", http.StatusUnauthorized, codec)
 			return
 		}
 
-		records, err := s.GetByUser(user.ID)
+		records, err := s.GetByUser(userID)
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusInternalServerError, codec)
 			return

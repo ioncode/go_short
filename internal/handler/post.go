@@ -7,8 +7,8 @@ import (
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
-	"github.com/ioncode/go_short/pkg"
 	"github.com/ioncode/go_short/pkg/http/audit"
+	"github.com/ioncode/go_short/pkg/http/auth"
 	"github.com/ioncode/httpcodec"
 )
 
@@ -39,13 +39,13 @@ func Post(s ShortService, shortBaseURL *url.URL, codec *httpcodec.Codec) http.Ha
 			return
 		}
 
-		user, err := pkg.UserFromContext(req.Context())
+		userID, err := auth.UserIDFromContext(req.Context())
 		if err != nil {
 			http.Error(res, "Ошибка авторизации", http.StatusUnauthorized)
 			return
 		}
 
-		alias, err := s.Short(model.Url(rawURL), *user)
+		alias, err := s.Short(model.Url(rawURL), model.User{ID: userID})
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -94,14 +94,14 @@ func APIPost(s ShortService, shortBaseURL *url.URL, codec *httpcodec.Codec) http
 			return
 		}
 
-		user, err := pkg.UserFromContext(req.Context())
+		userID, err := auth.UserIDFromContext(req.Context())
 		if err != nil {
 			writeJSONError(res, "Ошибка авторизации", http.StatusUnauthorized, codec)
 			return
 		}
 
 		// 2. Бизнес-логика
-		alias, err := s.Short(requestModel.URL, *user)
+		alias, err := s.Short(requestModel.URL, model.User{ID: userID})
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -163,14 +163,14 @@ func APIPostBatch(s BatchShortService, shortBaseURL *url.URL, codec *httpcodec.C
 			return
 		}
 
-		user, err := pkg.UserFromContext(req.Context())
+		userID, err := auth.UserIDFromContext(req.Context())
 		if err != nil {
 			writeJSONError(res, "Ошибка авторизации", http.StatusUnauthorized, codec)
 			return
 		}
 
 		// 2. Вызов бизнес-логики пакетного сокращения в O(1) репозитории
-		response, err := s.BatchShort(validItems, *user)
+		response, err := s.BatchShort(validItems, model.User{ID: userID})
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusBadRequest, codec)
 			return

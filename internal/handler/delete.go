@@ -5,7 +5,7 @@ import (
 
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/service"
-	"github.com/ioncode/go_short/pkg"
+	"github.com/ioncode/go_short/pkg/http/auth"
 	"github.com/ioncode/httpcodec"
 )
 
@@ -21,7 +21,7 @@ type DeleteService interface {
 // Это предотвращает фрагментацию памяти и снижает нагрузку на Garbage Collector при массовых удалениях.
 func AsyncDeleteUserSites(s DeleteService, codec *httpcodec.Codec) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		user, err := pkg.UserFromContext(req.Context())
+		userID, err := auth.UserIDFromContext(req.Context())
 		if err != nil {
 			writeJSONError(res, "Ошибка авторизации", http.StatusUnauthorized, codec)
 			return
@@ -35,7 +35,9 @@ func AsyncDeleteUserSites(s DeleteService, codec *httpcodec.Codec) http.HandlerF
 
 		// Передаем очищенный срез алиасов в асинхронный воркер-пул через очередь
 		s.Enqueue(service.DeleteTask{
-			Author:  *user,
+			Author: model.User{
+				ID: userID,
+			},
 			Aliases: aliases,
 		})
 

@@ -23,6 +23,7 @@ import (
 	"github.com/ioncode/go_short/pkg"
 	"github.com/ioncode/go_short/pkg/http/audit"
 	"github.com/ioncode/go_short/pkg/http/audit/remote"
+	"github.com/ioncode/go_short/pkg/http/auth"
 	"github.com/ioncode/go_short/pkg/http/request/payload"
 	"github.com/ioncode/httpcodec"
 	"go.uber.org/zap"
@@ -128,7 +129,7 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 	// Теперь securecookie работает со бинарным UUID напрямую!
 	sc.SetSerializer(pkg.UUIDCodec{})
 
-	authMiddleware := pkg.NewAuthMiddleware(sc)
+	authMiddleware := auth.NewAuthMiddleware(sc)
 
 	service := service.NewShortner(repo)
 

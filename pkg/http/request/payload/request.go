@@ -5,6 +5,14 @@
 // при передаче данных (таких как ID авторизованного пользователя или логи аудита)
 // сквозь цепочки middleware и хендлеров транспортного слоя, заменяя создание новых
 // системных контекстов модификацией полей существующего объекта по указателю.
+// ⚠️ ВАЖНОЕ ОГРАНИЧЕНИЕ ПО БЕЗОПАСНОСТИ (RACE CONDITION):
+// Контейнер Payload живет строго в рамках жизненного цикла текущего HTTP-запроса.
+// ЗАПРЕЩЕНО использовать контекст запроса с этим payload внутри фоновых горутин (go func).
+// После отправки ответа клиенту контейнер очищается и возвращается в пул.
+// Если вам нужны данные в горутине, скопируйте их в отдельные переменные ДО запуска горутины:
+//
+//	authorID := payload.GetAuthorID(r.Context())
+//	go func(id uuid.UUID) { /* использование id безопасно */ }(authorID)
 package payload
 
 import (
@@ -23,6 +31,11 @@ type contextKey string
 // находят контейнер полезной нагрузки в системном контексте запроса.
 const PayloadContextKey contextKey = "http_request_payload"
 
+const (
+	defaultMapCapacity = 4  // авторизация, аудит
+	maxMapCapacity     = 64 // Защита от утечки памяти (Memory Bloat)
+)
+
 // Payload представляет собой изолированный контейнер полезной нагрузки запроса.
 // Все внутренние поля строго приватны. Изменение и чтение состояния данных
 // возможны только через экспортируемый потокобезопасный интерфейс пакета.
@@ -36,7 +49,7 @@ type Payload struct {
 var pool = sync.Pool{
 	New: func() any {
 		return &Payload{
-			data: make(map[string]any, 2),
+			data: make(map[string]any, defaultMapCapacity),
 		}
 	},
 }
@@ -52,8 +65,14 @@ func Get() *Payload {
 func (p *Payload) Release() {
 	p.mu.Lock()
 	p.authorID = uuid.Nil
-	for k := range p.data {
-		delete(p.data, k)
+	// Защита от раздувания памяти: если мапа стала слишком большой,
+	// сбрасываем её емкость, позволяя GC очистить память.
+	if len(p.data) > maxMapCapacity {
+		p.data = make(map[string]any, defaultMapCapacity)
+	} else {
+		for k := range p.data {
+			delete(p.data, k)
+		}
 	}
 	p.mu.Unlock()
 	pool.Put(p)

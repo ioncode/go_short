@@ -14,7 +14,7 @@ import (
 	"github.com/ioncode/go_short/internal/config"
 	"github.com/ioncode/go_short/internal/handler"
 	"github.com/ioncode/go_short/internal/model"
-	"github.com/ioncode/go_short/pkg"
+	"github.com/ioncode/go_short/pkg/http/request/payload"
 	"github.com/ioncode/httpcodec"
 )
 
@@ -66,7 +66,11 @@ func TestPost(t *testing.T) {
 			)
 			handler := handler.Post(service, bu, codec)
 
-			ctx := pkg.WithUser(context.Background(), &model.User{ID: uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e")})
+			// 1. Создаем контекст с payload и получаем функцию очистки
+			ctx, teardown := newTestContextWithPayload(uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e"))
+
+			// 2. Гарантируем возврат структуры в пул сразу после завершения текущего тест-кейса
+			defer teardown()
 			req := httptest.NewRequestWithContext(ctx, http.MethodPost, "/", strings.NewReader("ya.ru"))
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
@@ -85,5 +89,24 @@ func TestPost(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+// newTestContextWithPayload инициализирует чистый Payload из пула, наполняет его
+// переданным userID и возвращает контекст вместе с функцией очистки (teardown).
+func newTestContextWithPayload(userID uuid.UUID) (context.Context, func()) {
+	// 1. Берем ОДИН контейнер из реального пула пакета payload
+	p := payload.Get()
+
+	// 2. Инициализируем базовый контекст с этим контейнером
+	ctx := context.WithValue(context.Background(), payload.PayloadContextKey, p)
+
+	// 3. Создаем временный запрос, чтобы безопасно вызвать экспортируемый API: payload.SetAuthorID
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "/", nil)
+	payload.SetAuthorID(req, userID)
+
+	// 4. Возвращаем готовый контекст запроса и функцию возврата структуры в пул
+	return req.Context(), func() {
+		p.Release()
 	}
 }

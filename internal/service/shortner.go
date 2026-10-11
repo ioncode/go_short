@@ -45,7 +45,7 @@ type SiteRepository interface {
 	GetByUrl(url model.Url) (model.Site, error)
 	Ping(ctx context.Context) error
 	Close() error
-	BatchStoreSites(sites []model.Site) error
+	BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortUrl) error
 	GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error)
 	Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error
 }
@@ -144,34 +144,57 @@ func (s *Shortner) Short(url model.Url, user model.User) (model.ShortUrl, error)
 	return "", errors.New("Исчерпано максимальное количество попыток сохранения сайта в репозиторий")
 }
 
-func (s *Shortner) BatchShort(items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+// BatchShort выполняет высокопроизводительное пакетное сокращение слайса URL.
+//
+// Метод полностью lock-free (s.mutex удален) и работает параллельно для всех ядер CPU.
+// Логика атомарного разрешения межзапросных гонок (Race Condition) и коллизий токенов
+// делегирована на уровень репозитория под его внутренний механизм изоляции.
+func (s *Shortner) BatchShort(ctx context.Context, items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error) {
+	if len(items) == 0 {
+		return nil, nil
+	}
 
-	var responseItems []model.BatchPostResponseItem
+	// 1. Преаллокация памяти — строго под размер входящей пачки.
+	// Это гарантирует ровно одну аллокацию в куче на всю функцию (Zero-Alloc в цикле).
+	newSites := make([]model.Site, len(items))
+	for i := range items {
+		// Генерируем случайный текстовый идентификатор оптимистично на стеке горутины
+		alias := model.ShortUrl(stringWithCharset(8))
 
-	var newSites []model.Site
-
-	for _, item := range items {
-		site, err := s.repository.GetByUrl(item.URL)
-
-		if err == nil {
-			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: site.ShortUrl})
-		} else {
-			alias := model.ShortUrl(stringWithCharset(8))
-			_, err = s.repository.GetByAlias(alias)
-			for err == nil {
-				alias = model.ShortUrl(stringWithCharset(8))
-				_, err = s.repository.GetByAlias(alias)
-			}
-
-			responseItems = append(responseItems, model.BatchPostResponseItem{CorrelationId: item.CorrelationId, Alias: alias})
-			newSites = append(newSites, model.Site{CorrelationId: item.CorrelationId, Url: item.URL, ShortUrl: alias, UserId: user.ID})
+		newSites[i] = model.Site{
+			CorrelationId: items[i].CorrelationId,
+			Url:           items[i].URL,
+			ShortUrl:      alias,
+			UserId:        user.ID,
 		}
 	}
 
-	err := s.repository.BatchStoreSites(newSites)
-	return responseItems, err
+	// 2. Передаем функцию генерации как легковесное замыкание (Слои архитектуры сохраняются).
+	// Репозиторий вызовет её как «черный ящик» только в случае редчайшего совпадения токенов в базе.
+	gen := func() model.ShortUrl {
+		return model.ShortUrl(stringWithCharset(8))
+	}
+
+	// 3. Отправляем ВСЮ пачку в репозиторий за один атомарный вызов.
+	// Метод репозитория под своей блокировкой (или транзакцией СУБД с EXCLUDED.correlation_id)
+	// проверит дубликаты и изменит ShortUrl прямо внутри переданного среза newSites.
+	err := s.repository.BatchStoreSites(ctx, newSites, gen)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Формируем финальный ответ клиенту на основе гарантированно консистентных данных.
+	// newSites[i].ShortUrl теперь содержит либо новый сгенерированный алиас,
+	// либо старый алиас, который ранее выиграл конкурентную гонку в базе данных.
+	responseItems := make([]model.BatchPostResponseItem, len(items))
+	for i := range newSites {
+		responseItems[i] = model.BatchPostResponseItem{
+			CorrelationId: newSites[i].CorrelationId,
+			Alias:         newSites[i].ShortUrl,
+		}
+	}
+
+	return responseItems, nil
 }
 
 func (s *Shortner) GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error) {

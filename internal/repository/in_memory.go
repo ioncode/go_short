@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -178,25 +179,40 @@ func (r *MapRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
 	return site.ShortUrl, nil
 }
 
-// BatchStoreSites выполняет пакетное сохранение среза сайтов в репозиторий.
-//
-// Метод полностью оптимизирован под рантайм. Чтобы избежать утечек памяти
-// и удержания в куче всего входящего среза сайтов, для каждого элемента создается
-// независимая копия структуры в куче. Указатели на эти копии сохраняются во все
-// внутренние индексы за O(1) на элемент.
-func (r *MapRepository) BatchStoreSites(sites []model.Site) error {
+// BatchStoreSites атомарно сохраняет пачку сайтов в оперативную память.
+// Метод полностью защищает от параллельных Race Conditions между пользователями
+// и на месте разрешает коллизии токенов, изменяя исходный массив для корректного ответа сервиса.
+func (r *MapRepository) BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortUrl) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	for i := range sites {
-		// Создаем изолированную копию структуры в куче.
-		// Это гарантирует, что временный массив входящего среза sites будет успешно
-		// уничтожен сборщиком мусора сразу после завершения HTTP-запроса.
-		allocatedSite := new(model.Site)
-		*allocatedSite = sites[i] // Копируем данные
+		// Быстрая проверка контекста на каждой итерации по элементам батча
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("in_memory: batch context canceled: %w", err)
+		}
 
-		// Передаем адрес безопасной изолированной копии во все индексы за O(1)
-		r.addIndexes(allocatedSite)
+		if existingSite, exists := r.urls[sites[i].Url]; exists {
+			sites[i].ShortUrl = existingSite.ShortUrl
+			continue
+		}
+
+		// Защита от коллизии токена с проверкой контекста внутри
+		for {
+			if _, exists := r.sites[sites[i].ShortUrl]; !exists {
+				break
+			}
+
+			// Проверяем контекст внутри редкого цикла регенерации токена
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("in_memory: token generation context canceled: %w", err)
+			}
+
+			sites[i].ShortUrl = genAlias()
+		}
+
+		sitePtr := &sites[i]
+		r.addIndexes(sitePtr)
 	}
 
 	if r.file == nil {

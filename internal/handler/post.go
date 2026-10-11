@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -19,7 +20,7 @@ type ShortService interface {
 
 // BatchShortService определяет интерфейс для бизнес-логики пакетного сокращения ссылок.
 type BatchShortService interface {
-	BatchShort(items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error)
+	BatchShort(ctx context.Context, items []model.BatchPostRequestItem, user model.User) ([]model.BatchPostResponseItem, error)
 }
 
 // Post обрабатывает текстовые запросы (text/plain) на сокращение URL.
@@ -170,7 +171,7 @@ func APIPostBatch(s BatchShortService, shortBaseURL *url.URL, codec *httpcodec.C
 		}
 
 		// 2. Вызов бизнес-логики пакетного сокращения в O(1) репозитории
-		response, err := s.BatchShort(validItems, model.User{ID: userID})
+		response, err := s.BatchShort(req.Context(), validItems, model.User{ID: userID})
 		if err != nil {
 			writeJSONError(res, err.Error(), http.StatusBadRequest, codec)
 			return

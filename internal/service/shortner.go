@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"math/rand/v2"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,7 +57,6 @@ type DeleteTask struct {
 // service struct
 type Shortner struct {
 	repository SiteRepository
-	mutex      sync.Mutex
 	taskChan   chan DeleteTask // Общий канал-приемник (результат Fan-In)
 }
 
@@ -141,7 +139,7 @@ func (s *Shortner) Short(url model.Url, user model.User) (model.ShortUrl, error)
 	}
 
 	// Если за maxShortenRetries попыток база данных так и не смогла принять запись
-	return "", errors.New("Исчерпано максимальное количество попыток сохранения сайта в репозиторий")
+	return "", errors.New("исчерпано максимальное количество попыток сохранения сайта в репозиторий")
 }
 
 // BatchShort выполняет высокопроизводительное пакетное сокращение слайса URL.

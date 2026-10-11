@@ -65,7 +65,7 @@ func Benchmark_E2E_DeleteUserSites(b *testing.B) {
 
 		// 6. Достаем результирующий статус-код сервера
 		respResult := res.Result()
-		respResult.Body.Close()
+		_ = respResult.Body.Close()
 
 		// Хендлер по спецификации должен возвращать статус 202 Accepted
 		if respResult.StatusCode != http.StatusAccepted {
@@ -104,7 +104,7 @@ func Benchmark_DeleteUserSitesParallel(b *testing.B) {
 			env.Router.ServeHTTP(res, req)
 
 			respResult := res.Result()
-			respResult.Body.Close()
+			_ = respResult.Body.Close()
 
 			// Хендлер по спецификации должен возвращать статус 202 Accepted
 			if respResult.StatusCode != http.StatusAccepted {

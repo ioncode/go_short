@@ -41,9 +41,11 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 func Serve(ctx context.Context, config *config.Config) error {
 	router, repo, auditor := SetupRouter(ctx, config)
-	defer repo.Close()
+	defer func() {
+		_ = repo.Close()
+	}()
 	// По умолчанию отдаем чистый роутер без накладных расходов логгера
-	var finalHandler http.Handler = router
+	var finalHandler = router
 
 	// Проверяем уровень логирования один раз при старте сервера.
 	// Подключаем middleware, только если в конфиге включен уровень Info (или ниже)
@@ -61,7 +63,7 @@ func Serve(ctx context.Context, config *config.Config) error {
 	// 1. Запуск HTTP-сервера
 	eg.Go(func() error {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("Ошибка запуска HTTP сервера: %w", err)
+			return fmt.Errorf("ошибка запуска HTTP сервера: %w", err)
 		}
 		return nil
 	})
@@ -76,12 +78,12 @@ func Serve(ctx context.Context, config *config.Config) error {
 		httpCtx, cancelHttp := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelHttp()
 		if err := srv.Shutdown(httpCtx); err != nil {
-			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("Ошибка остановки HTTP сервера: %w", err))
+			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("ошибка остановки HTTP сервера: %w", err))
 		}
 
 		// Останавливаем аудитор
 		if err := auditor.Shutdown(5 * time.Second); err != nil {
-			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("Ошибка остановки аудитора: %w", err))
+			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("ошибка остановки аудитора: %w", err))
 		}
 
 		return shutdownErr

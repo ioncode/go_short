@@ -17,9 +17,9 @@ import (
 
 // Ошибки бизнес-логики репозитория.
 var (
-	ErrSiteExists    = errors.New("Site allready shorted")
-	ErrSiteNotFound  = errors.New("Site not found")
-	ErrAliasConflict = errors.New("Alias allready generated, try new one")
+	ErrSiteExists    = errors.New("site allready shorted")
+	ErrSiteNotFound  = errors.New("site not found")
+	ErrAliasConflict = errors.New("alias allready generated, try new one")
 )
 
 // MapRepository — это потокобезопасная реализация хранилища сокращенных ссылок в оперативной памяти (RAM).

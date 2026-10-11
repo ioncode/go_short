@@ -18,10 +18,10 @@ func TestMapShortner_Short(t *testing.T) {
 
 	repo := repository.NewMapRepository("test_storage.json")
 	t.Cleanup(func() {
-		repo.Close()
-		os.RemoveAll("test_storage.json")
+		_ = repo.Close()
+		_ = os.RemoveAll("test_storage.json")
 	})
-	repo.StoreSite(model.Site{
+	_, _ = repo.StoreSite(model.Site{
 		Url:      "ya.ru",
 		ShortUrl: "123",
 	})
@@ -64,14 +64,14 @@ func TestMapShortner_Short(t *testing.T) {
 func TestMapShortner_Get(t *testing.T) {
 	repo := repository.NewMapRepository("test_storage.json")
 	t.Cleanup(func() {
-		repo.Close()
-		os.RemoveAll("test_storage.json")
+		_ = repo.Close()
+		_ = os.RemoveAll("test_storage.json")
 	})
 	site := model.Site{
 		Url:      "ya.ru",
 		ShortUrl: "123",
 	}
-	repo.StoreSite(site)
+	_, _ = repo.StoreSite(site)
 	tests := []struct {
 		name    string
 		r       service.SiteRepository

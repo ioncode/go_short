@@ -82,7 +82,7 @@ func Test_middleware(t *testing.T) {
 			middleware := mw(corsMiddleware(tt.next))
 			middleware.ServeHTTP(rec, req)
 			res := rec.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			if res.StatusCode != tt.expectedStatus {
 				t.Errorf("expected status %d; got %d", tt.expectedStatus, res.StatusCode)
 			}

@@ -58,7 +58,7 @@ func TestGet(t *testing.T) {
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 			res := w.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			if res.StatusCode != tt.expectedStatus {
 				t.Errorf("expected status %d; got %d", tt.expectedStatus, res.StatusCode)
 			}

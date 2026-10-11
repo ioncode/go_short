@@ -69,7 +69,7 @@ func Post(s ShortService, shortBaseURL *url.URL, codec *httpcodec.Codec) http.Ha
 		// Отправляем текстовый ответ в сеть
 		res.Header().Set("Content-Type", "text/plain")
 		res.WriteHeader(respStatus)
-		res.Write([]byte(resultURL))
+		_, _ = res.Write([]byte(resultURL))
 	}
 }
 

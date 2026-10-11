@@ -117,7 +117,7 @@ func BenchmarkFileObserver_SingleThread(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Не удалось создать логгер: %v", err)
 	}
-	defer observer.Close()
+	defer func() { _ = observer.Close() }()
 
 	event := Event{
 		TS:         time.Now().Unix(),
@@ -146,7 +146,7 @@ func BenchmarkFileObserver_Parallel(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Не удалось создать логгер: %v", err)
 	}
-	defer observer.Close()
+	defer func() { _ = observer.Close() }()
 
 	event := Event{
 		TS:         time.Now().Unix(),

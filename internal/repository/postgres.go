@@ -79,7 +79,7 @@ func (r *PostgresSitesRepository) GetByUser(authorID uuid.UUID) ([]model.UserSit
 	if err != nil {
 		return records, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Читаем строки из БД
 	for rows.Next() {
@@ -166,7 +166,7 @@ func (r *PostgresSitesRepository) BatchStoreSites(ctx context.Context, sites []m
 	if err != nil {
 		return err
 	}
-	defer pgxConn.Close(ctx)
+	defer func() { _ = pgxConn.Close(ctx) }()
 
 	// Предвыделяем буфер под строки один раз на все ретраи (Zero-Alloc в цикле)
 	rowsBuf := make([][]any, 0, len(sites))

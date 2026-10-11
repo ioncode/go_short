@@ -139,7 +139,7 @@ func executePostRequest(
 	router.ServeHTTP(res, req)
 
 	respResult := res.Result()
-	respResult.Body.Close()
+	_ = respResult.Body.Close()
 
 	if respResult.StatusCode != http.StatusCreated {
 		b.Fatalf("Ожидался статус 201, получен %d: %s", respResult.StatusCode, res.Body.String())

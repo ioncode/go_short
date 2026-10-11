@@ -39,7 +39,7 @@ func Benchmark_E2E_Get_Alias(b *testing.B) {
 		env.Router.ServeHTTP(res, req)
 
 		respResult := res.Result()
-		respResult.Body.Close()
+		_ = respResult.Body.Close()
 		if respResult.StatusCode != http.StatusTemporaryRedirect {
 			b.Fatalf("Ожидался статус 307, получен %d", respResult.StatusCode)
 		}
@@ -83,7 +83,7 @@ func Benchmark_E2E_GetUserSites(b *testing.B) {
 		env.Router.ServeHTTP(res, req)
 
 		respResult := res.Result()
-		respResult.Body.Close()
+		_ = respResult.Body.Close()
 
 		if respResult.StatusCode != http.StatusOK {
 			b.Fatalf("Ожидался статус 200 OK, получен %d. Ответ: %s", respResult.StatusCode, res.Body.String())

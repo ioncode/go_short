@@ -55,7 +55,7 @@ func (c *HTTPClient) SendPostRequest(ctx context.Context, payload []byte) error 
 
 	defer func() {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		c.bufPool.Put(buf) // Возврат буфера строго после завершения чтения сетевым стеком
 	}()
 

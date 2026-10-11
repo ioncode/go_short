@@ -38,10 +38,10 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				r.Close()
-				os.RemoveAll("test_storage.json")
+				_ = r.Close()
+				_ = os.RemoveAll("test_storage.json")
 			})
-			r.StoreSite(tt.want)
+			_, _ = r.StoreSite(tt.want)
 			got, gotError := r.GetByUrl(tt.url)
 			if gotError != nil {
 				if !tt.wantError {
@@ -89,10 +89,10 @@ func TestMapRepository_GetByAlias(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				r.Close()
-				os.RemoveAll("test_storage.json")
+				_ = r.Close()
+				_ = os.RemoveAll("test_storage.json")
 			})
-			r.StoreSite(tt.want)
+			_, _ = r.StoreSite(tt.want)
 			got, gotErr := r.GetByAlias(tt.alias)
 			if gotErr != nil {
 				if !tt.wantErr {
@@ -139,10 +139,10 @@ func TestMapRepository_StoreSite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				r.Close()
-				os.RemoveAll("test_storage.json")
+				_ = r.Close()
+				_ = os.RemoveAll("test_storage.json")
 			})
-			r.StoreSite(model.Site{
+			_, _ = r.StoreSite(model.Site{
 				Url:      "yandex.ru",
 				ShortUrl: "sfdsfgd",
 			})

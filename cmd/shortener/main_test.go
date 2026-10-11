@@ -32,9 +32,9 @@ func Test_main(t *testing.T) {
 		// останавливаем сервер после завершения теста
 		srv.Close()
 		//закрываем репозиторий
-		repo.Close()
+		_ = repo.Close()
 		//удаляем файл хранения
-		os.Remove("test_storage.json")
+		_ = os.Remove("test_storage.json")
 	})
 
 	//save site for reading in tests
@@ -169,7 +169,9 @@ func Test_main(t *testing.T) {
 			req.URL = srv.URL + tt.path
 
 			resp, err := req.Send()
-			defer resp.RawBody().Close()
+			defer func() {
+				_ = resp.RawBody().Close()
+			}()
 			if !errors.Is(err, resty.ErrAutoRedirectDisabled) {
 				assert.NoError(t, err, "error making HTTP request")
 			}
@@ -192,7 +194,9 @@ func Test_main(t *testing.T) {
 			if tt.expectedContentEncoding == "gzip" && tt.expectedBody != "" {
 				gzipReader, err := gzip.NewReader(resp.RawBody())
 				assert.NoError(t, err, "error reading gzipped response")
-				defer gzipReader.Close()
+				defer func() {
+					_ = gzipReader.Close()
+				}()
 				unzippedData, err := io.ReadAll(gzipReader)
 				assert.NoError(t, err, "error reading unGzipped data")
 				assert.Equal(t, tt.expectedBody, string(unzippedData))

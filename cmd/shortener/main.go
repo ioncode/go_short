@@ -26,7 +26,9 @@ func main() {
 	if err := logger.Initialize("INFO"); err != nil {
 		log.Panic("Не удалось инициализировать логгер: ", err)
 	}
-	defer logger.Sync() // Сбрасываем буфер логов перед закрытием
+	defer func() {
+		_ = logger.Sync() // Сбрасываем буфер логов перед закрытием
+	}()
 
 	logger.Log.Info("Запуск приложения",
 		zap.String("address", cfg.ServerAddress),

@@ -101,7 +101,7 @@ func generateBatchJSON(buf []byte, counter uint64) []byte {
 func resetRecorder(res *httptest.ResponseRecorder) {
 	res.Code = 0
 	res.Body.Reset()
-	res.HeaderMap = make(http.Header)
+	clear(res.Header())
 }
 
 func executePostRequest(

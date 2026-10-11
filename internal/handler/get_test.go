@@ -15,11 +15,11 @@ type MockGetService struct {
 	MockGet func(alias string) (string, error)
 }
 
-func (m *MockGetService) Get(alias model.ShortUrl) (model.Site, error) {
-	Url, error := m.MockGet(string(alias))
+func (m *MockGetService) Get(alias model.ShortURL) (model.Site, error) {
+	URL, error := m.MockGet(string(alias))
 	site := model.Site{
-		Url:      model.Url(Url),
-		ShortUrl: alias,
+		URL:      model.URL(URL),
+		ShortURL: alias,
 	}
 	return site, error
 }
@@ -58,7 +58,7 @@ func TestGet(t *testing.T) {
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 			res := w.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			if res.StatusCode != tt.expectedStatus {
 				t.Errorf("expected status %d; got %d", tt.expectedStatus, res.StatusCode)
 			}

@@ -75,8 +75,8 @@ func Serve(ctx context.Context, config *config.Config) error {
 		var shutdownErr error
 
 		// Останавливаем HTTP-сервер
-		httpCtx, cancelHttp := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancelHttp()
+		httpCtx, cancelHTTP := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelHTTP()
 		if err := srv.Shutdown(httpCtx); err != nil {
 			shutdownErr = errors.Join(shutdownErr, fmt.Errorf("ошибка остановки HTTP сервера: %w", err))
 		}
@@ -184,16 +184,16 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 	router.Get("/ping", handler.Ping(repo))
 
 	// Текстовый эндпоинт (Вход: text/plain, Выход: text/plain)
-	router.With(chiMiddleware.AllowContentType("text/plain"), auditor.Middleware).Post("/", handler.Post(service, config.ShortBaseUrl, codec))
+	router.With(chiMiddleware.AllowContentType("text/plain"), auditor.Middleware).Post("/", handler.Post(service, config.ShortBaseURL, codec))
 
 	// Одиночный REST API эндпоинт (Вход: JSON, Выход: JSON)
-	router.With(chiMiddleware.AllowContentType("application/json"), auditor.Middleware).Post("/api/shorten", handler.APIPost(service, config.ShortBaseUrl, codec))
+	router.With(chiMiddleware.AllowContentType("application/json"), auditor.Middleware).Post("/api/shorten", handler.APIPost(service, config.ShortBaseURL, codec))
 
 	// Пакетный REST API эндпоинт батчей (Вход: JSON-массив, Выход: JSON-массив)
-	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten/batch", handler.APIPostBatch(service, config.ShortBaseUrl, codec))
+	router.With(chiMiddleware.AllowContentType("application/json")).Post("/api/shorten/batch", handler.APIPostBatch(service, config.ShortBaseURL, codec))
 
 	// Список сайтов пользователя (Выход: JSON-массив)
-	router.Get("/api/user/urls", handler.GetUserSites(service, config.ShortBaseUrl, codec))
+	router.Get("/api/user/urls", handler.GetUserSites(service, config.ShortBaseURL, codec))
 
 	// запрос на пакетное удаление ссылок пользователя (Вход: JSON-массив, Выход: JSON-ошибка авторизации или заголовк 202)
 	router.Delete("/api/user/urls", handler.AsyncDeleteUserSites(service, codec))

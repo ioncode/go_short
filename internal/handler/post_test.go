@@ -22,9 +22,9 @@ type MockService struct {
 	MockShort func(url string) (string, error)
 }
 
-func (m *MockService) Short(url model.Url, user model.User) (model.ShortUrl, error) {
+func (m *MockService) Short(url model.URL, user model.User) (model.ShortURL, error) {
 	alias, error := m.MockShort(string(url))
-	return model.ShortUrl(alias), error
+	return model.ShortURL(alias), error
 }
 func TestPost(t *testing.T) {
 

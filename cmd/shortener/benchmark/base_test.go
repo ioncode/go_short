@@ -36,10 +36,10 @@ type BenchEnv struct {
 func initBenchEnv(b *testing.B) BenchEnv {
 	ctx := context.Background()
 
-	shortBaseUrl, _ := url.Parse("http://localhost:8080/")
+	shortBaseURL, _ := url.Parse("http://localhost:8080/")
 	cfg := &config.Config{
 		ServerAddress: ":8080",
-		ShortBaseUrl:  shortBaseUrl,
+		ShortBaseURL:  shortBaseURL,
 		StoragePath:   "", // Чистая RAM
 	}
 
@@ -65,8 +65,8 @@ func initBenchEnv(b *testing.B) BenchEnv {
 	}
 
 	var userID uuid.UUID
-	if site, err := repo.GetByUrl(model.Url(warmupURL)); err == nil {
-		userID = site.UserId
+	if site, err := repo.GetByURL(model.URL(warmupURL)); err == nil {
+		userID = site.UserID
 	}
 
 	return BenchEnv{

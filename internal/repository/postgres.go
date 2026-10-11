@@ -28,7 +28,7 @@ func (r *PostgresSitesRepository) Ping(ctx context.Context) error {
 	return r.db.PingContext(ctx)
 }
 
-func (r *PostgresSitesRepository) GetByAlias(alias model.ShortUrl) (model.Site, error) {
+func (r *PostgresSitesRepository) GetByAlias(alias model.ShortURL) (model.Site, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	row := r.db.QueryRowContext(ctx,
@@ -36,7 +36,7 @@ func (r *PostgresSitesRepository) GetByAlias(alias model.ShortUrl) (model.Site, 
 			"FROM sites WHERE short_url = $1 LIMIT 1", alias)
 
 	var site model.Site
-	err := row.Scan(&site.Url, &site.DeletedFlag)
+	err := row.Scan(&site.URL, &site.DeletedFlag)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return site, ErrSiteNotFound
@@ -44,11 +44,11 @@ func (r *PostgresSitesRepository) GetByAlias(alias model.ShortUrl) (model.Site, 
 		return site, fmt.Errorf("postgres: get site by alias %q: %w", alias, err)
 	}
 
-	site.ShortUrl = alias
+	site.ShortURL = alias
 	return site, nil
 }
 
-func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
+func (r *PostgresSitesRepository) GetByURL(url model.URL) (model.Site, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	row := r.db.QueryRowContext(ctx,
@@ -56,7 +56,7 @@ func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
 			"FROM sites WHERE url = $1 LIMIT 1", url)
 
 	var site model.Site
-	err := row.Scan(&site.ShortUrl)
+	err := row.Scan(&site.ShortURL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return site, ErrSiteNotFound
@@ -64,7 +64,7 @@ func (r *PostgresSitesRepository) GetByUrl(url model.Url) (model.Site, error) {
 		return site, fmt.Errorf("postgres: get site by URL %q: %w", url, err)
 	}
 
-	site.Url = url
+	site.URL = url
 	return site, nil
 }
 
@@ -99,7 +99,7 @@ func (r *PostgresSitesRepository) GetByUser(authorID uuid.UUID) ([]model.UserSit
 	return records, nil
 }
 
-func (r *PostgresSitesRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
+func (r *PostgresSitesRepository) StoreSite(site model.Site) (model.ShortURL, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
@@ -114,7 +114,7 @@ func (r *PostgresSitesRepository) StoreSite(site model.Site) (model.ShortUrl, er
 	`
 
 	var resultAlias string
-	err := r.db.QueryRowContext(ctx, query, site.Url, site.ShortUrl, site.UserId).Scan(&resultAlias)
+	err := r.db.QueryRowContext(ctx, query, site.URL, site.ShortURL, site.UserID).Scan(&resultAlias)
 
 	if err != nil {
 		// Проверяем, не является ли ошибка результатом коллизии сгенерированного short_url
@@ -134,19 +134,19 @@ func (r *PostgresSitesRepository) StoreSite(site model.Site) (model.ShortUrl, er
 
 	// Если возвращенный из базы алиас НЕ совпадает с тем, который мы генерировали,
 	// значит сработал триггер ON CONFLICT, и этот URL уже существовал в системе.
-	if resultAlias != string(site.ShortUrl) {
-		return model.ShortUrl(resultAlias), ErrSiteExists
+	if resultAlias != string(site.ShortURL) {
+		return model.ShortURL(resultAlias), ErrSiteExists
 	}
 
 	// Успешная вставка новой уникальной ссылки
-	return site.ShortUrl, nil
+	return site.ShortURL, nil
 }
 
 func (r *PostgresSitesRepository) Close() error {
 	return r.db.Close()
 }
 
-func (r *PostgresSitesRepository) Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error {
+func (r *PostgresSitesRepository) Delete(ctx context.Context, aliases []model.ShortURL, user model.User) error {
 	query := `
 		UPDATE sites SET is_deleted = true 
 		WHERE user_id = $1 
@@ -160,7 +160,7 @@ func (r *PostgresSitesRepository) Delete(ctx context.Context, aliases []model.Sh
 
 // BatchStoreSites выполняет пакетное сохранение сайтов с атомарным разрешением коллизий.
 // Метод полностью lock-free на уровне Go-сервиса и использует бинарный протокол COPY.
-func (r *PostgresSitesRepository) BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortUrl) error {
+func (r *PostgresSitesRepository) BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortURL) error {
 	// Извлекаем нативное соединение из пула sql.DB
 	pgxConn, err := r.extractPgxConn(ctx)
 	if err != nil {
@@ -191,8 +191,8 @@ func (r *PostgresSitesRepository) BatchStoreSites(ctx context.Context, sites []m
 		if err == nil {
 			// УСПЕХ: прописываем выигравшие алиасы обратно в массив сервиса
 			for i := range sites {
-				if winnerAlias, exists := actualAliases[sites[i].CorrelationId]; exists {
-					sites[i].ShortUrl = winnerAlias
+				if winnerAlias, exists := actualAliases[sites[i].CorrelationID]; exists {
+					sites[i].ShortURL = winnerAlias
 				}
 			}
 			return tx.Commit(ctx)
@@ -202,10 +202,10 @@ func (r *PostgresSitesRepository) BatchStoreSites(ctx context.Context, sites []m
 		_ = tx.Rollback(ctx)
 
 		// Декларативно проверяем, была ли ошибка коллизией случайно сгенерированного токена (short_url)
-		if r.isShortUrlCollision(err) {
+		if r.isShortURLCollision(err) {
 			// Перегенерируем алиасы на CPU и уходим на следующий круг цикла ретрая
 			for i := range sites {
-				sites[i].ShortUrl = genAlias()
+				sites[i].ShortURL = genAlias()
 			}
 			continue
 		}
@@ -222,7 +222,7 @@ func (r *PostgresSitesRepository) executeBatchPipeline(
 	pgxConn *pgx.Conn,
 	sites []model.Site,
 	rowsBuf *[][]any,
-) (map[string]model.ShortUrl, error) {
+) (map[string]model.ShortURL, error) {
 	// Шаг 1: Создаем пустую стейджинг-таблицу
 	if err := r.prepareStagingTable(ctx, tx); err != nil {
 		return nil, err
@@ -290,10 +290,10 @@ func (r *PostgresSitesRepository) copyToStaging(
 
 	for i := range sites {
 		*rowsBuf = append(*rowsBuf, []any{
-			sites[i].CorrelationId,
-			sites[i].Url,
-			sites[i].ShortUrl,
-			sites[i].UserId,
+			sites[i].CorrelationID,
+			sites[i].URL,
+			sites[i].ShortURL,
+			sites[i].UserID,
 		})
 	}
 
@@ -311,7 +311,7 @@ func (r *PostgresSitesRepository) copyToStaging(
 }
 
 // mergeStagingToMain производит атомарное слияние с СУБД без мутации исторических пустых correlation_id.
-func (r *PostgresSitesRepository) mergeStagingToMain(ctx context.Context, tx pgx.Tx) (map[string]model.ShortUrl, error) {
+func (r *PostgresSitesRepository) mergeStagingToMain(ctx context.Context, tx pgx.Tx) (map[string]model.ShortURL, error) {
 	// Оборачиваем INSERT в СТЕ (inserted_rows). Он возвращает только url и short_url.
 	// Затем мы честно через JOIN соединяем результат с tmp_sites по уникальному url.
 	// Это позволяет вытащить correlation_id из входящего батча, даже если в БД он пустой.
@@ -333,10 +333,10 @@ func (r *PostgresSitesRepository) mergeStagingToMain(ctx context.Context, tx pgx
 	}
 	defer dbRows.Close()
 
-	actualAliases := make(map[string]model.ShortUrl)
+	actualAliases := make(map[string]model.ShortURL)
 	for dbRows.Next() {
 		var correlationID string
-		var shortURL model.ShortUrl
+		var shortURL model.ShortURL
 		if err := dbRows.Scan(&correlationID, &shortURL); err != nil {
 			return nil, fmt.Errorf("scan merge returning row failed: %w", err)
 		}
@@ -351,8 +351,8 @@ func (r *PostgresSitesRepository) mergeStagingToMain(ctx context.Context, tx pgx
 	return actualAliases, nil
 }
 
-// isShortUrlCollision проверяет, является ли ошибка нарушением уникальности индекса short_url.
-func (r *PostgresSitesRepository) isShortUrlCollision(err error) bool {
+// isShortURLCollision проверяет, является ли ошибка нарушением уникальности индекса short_url.
+func (r *PostgresSitesRepository) isShortURLCollision(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		// Код 23505 — unique_violation в PostgreSQL

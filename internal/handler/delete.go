@@ -27,7 +27,7 @@ func AsyncDeleteUserSites(s DeleteService, codec *httpcodec.Codec) http.HandlerF
 			return
 		}
 
-		var aliases []model.ShortUrl
+		var aliases []model.ShortURL
 
 		if !codec.ReadJSON(res, req, &aliases) {
 			return // Ошибки формата или DoS-атак уже отправлены кодеком наружу

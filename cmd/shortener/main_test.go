@@ -20,10 +20,10 @@ import (
 
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
-	shortBaseUrl, _ := url.Parse("http://localhost:8080/")
+	shortBaseURL, _ := url.Parse("http://localhost:8080/")
 	router, repo, _ := router.SetupRouter(context.Background(), &config.Config{
 		ServerAddress: ":8080",
-		ShortBaseUrl:  shortBaseUrl,
+		ShortBaseURL:  shortBaseURL,
 		StoragePath:   "test_storage.json",
 	})
 	srv := httptest.NewServer(router)

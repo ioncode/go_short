@@ -1,7 +1,7 @@
 package model
 
 type PostRequest struct {
-	URL Url `json:"url"`
+	URL URL `json:"url"`
 }
 
 type ErrorResponse struct {
@@ -13,16 +13,16 @@ type PostResponse struct {
 }
 
 type BatchPostRequestItem struct {
-	URL           Url    `json:"original_url"`
-	CorrelationId string `json:"correlation_id"`
+	URL           URL    `json:"original_url"`
+	CorrelationID string `json:"correlation_id"`
 }
 
 type BatchPostResponseItem struct {
-	Alias         ShortUrl `json:"short_url"`
-	CorrelationId string   `json:"correlation_id"`
+	Alias         ShortURL `json:"short_url"`
+	CorrelationID string   `json:"correlation_id"`
 }
 
 type UserSitesResponseItem struct {
-	Alias ShortUrl `json:"short_url"`
-	URL   Url      `json:"original_url"`
+	Alias ShortURL `json:"short_url"`
+	URL   URL      `json:"original_url"`
 }

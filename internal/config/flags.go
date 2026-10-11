@@ -10,7 +10,7 @@ import (
 // Config содержит глобальные настройки конфигурации приложения.
 type Config struct {
 	ServerAddress string
-	ShortBaseUrl  *url.URL
+	ShortBaseURL  *url.URL
 	StoragePath   string
 	DataBaseDSN   string
 	AuditFile     string
@@ -34,8 +34,8 @@ func ParseFlags() *Config {
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
 		cfg.ServerAddress = envServerAddress
 	}
-	if envBaseUrl := os.Getenv("BASE_URL"); envBaseUrl != "" {
-		rawShortBaseURL = envBaseUrl
+	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
+		rawShortBaseURL = envBaseURL
 	}
 	if envStoragePath := os.Getenv("FILE_STORAGE_PATH"); envStoragePath != "" {
 		cfg.StoragePath = envStoragePath
@@ -55,7 +55,7 @@ func ParseFlags() *Config {
 
 	var err error
 
-	cfg.ShortBaseUrl, err = url.Parse(normalizeURL(rawShortBaseURL))
+	cfg.ShortBaseURL, err = url.Parse(normalizeURL(rawShortBaseURL))
 	if err != nil {
 		panic("invalid base URL: " + err.Error())
 	}

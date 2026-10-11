@@ -29,9 +29,9 @@ var (
 //   - Хранит указатели *model.Site для экономии памяти и исключения дублирования строк.
 //   - Содержит три хэш-индекса для мгновенного доступа к данным за константное время O(1).
 type MapRepository struct {
-	sites    map[model.ShortUrl]*model.Site // Индекс для быстрого поиска по короткому алиасу (O(1))
-	urls     map[model.Url]*model.Site      // Индекс для мгновенной проверки уникальности оригинального URL (O(1))
-	userUrls map[uuid.UUID][]model.ShortUrl // Индекс для мгновенного получения ссылок конкретного пользователя (O(1))
+	sites    map[model.ShortURL]*model.Site // Индекс для быстрого поиска по короткому алиасу (O(1))
+	urls     map[model.URL]*model.Site      // Индекс для мгновенной проверки уникальности оригинального URL (O(1))
+	userUrls map[uuid.UUID][]model.ShortURL // Индекс для мгновенного получения ссылок конкретного пользователя (O(1))
 	mutex    sync.RWMutex                   // RWMutex для безопасного конкурентного доступа к мапам
 	file     *os.File                       // Дескриптор файла для персистентного хранения данных на диске
 }
@@ -50,9 +50,9 @@ func NewMapRepository(storagePath string) *MapRepository {
 
 	if storagePath == "" {
 		return &MapRepository{
-			sites:    make(map[model.ShortUrl]*model.Site, initialCapacity),
-			urls:     make(map[model.Url]*model.Site, initialCapacity),
-			userUrls: make(map[uuid.UUID][]model.ShortUrl),
+			sites:    make(map[model.ShortURL]*model.Site, initialCapacity),
+			urls:     make(map[model.URL]*model.Site, initialCapacity),
+			userUrls: make(map[uuid.UUID][]model.ShortURL),
 			file:     nil,
 		}
 	}
@@ -63,9 +63,9 @@ func NewMapRepository(storagePath string) *MapRepository {
 	}
 
 	repository := MapRepository{
-		sites:    make(map[model.ShortUrl]*model.Site),
-		urls:     make(map[model.Url]*model.Site),
-		userUrls: make(map[uuid.UUID][]model.ShortUrl),
+		sites:    make(map[model.ShortURL]*model.Site),
+		urls:     make(map[model.URL]*model.Site),
+		userUrls: make(map[uuid.UUID][]model.ShortURL),
 		file:     file,
 	}
 
@@ -98,9 +98,9 @@ func NewMapRepository(storagePath string) *MapRepository {
 //
 // ВНИМАНИЕ: Метод thread-unsafe и должен вызываться строго из-под блокировки r.mutex.
 func (r *MapRepository) addIndexes(sitePtr *model.Site) {
-	r.sites[sitePtr.ShortUrl] = sitePtr
-	r.urls[sitePtr.Url] = sitePtr
-	r.userUrls[sitePtr.UserId] = append(r.userUrls[sitePtr.UserId], sitePtr.ShortUrl)
+	r.sites[sitePtr.ShortURL] = sitePtr
+	r.urls[sitePtr.URL] = sitePtr
+	r.userUrls[sitePtr.UserID] = append(r.userUrls[sitePtr.UserID], sitePtr.ShortURL)
 }
 
 // GetByAlias возвращает информацию о сайте по его короткому буквенно-цифровому алиасу.
@@ -109,7 +109,7 @@ func (r *MapRepository) addIndexes(sitePtr *model.Site) {
 // параллельных запросов на чтение (GET) выполняться без задержек.
 // Если алиас найден, возвращается копия структуры model.Site. Если алиас
 // отсутствует в базе, возвращается пустая структура и ошибка ErrSiteNotFound.
-func (r *MapRepository) GetByAlias(alias model.ShortUrl) (model.Site, error) {
+func (r *MapRepository) GetByAlias(alias model.ShortURL) (model.Site, error) {
 	r.mutex.RLock() // Разрешаем параллельное конкурентное чтение
 	defer r.mutex.RUnlock()
 
@@ -141,22 +141,22 @@ func (r *MapRepository) GetByAlias(alias model.ShortUrl) (model.Site, error) {
 //   - error: nil при успешном сохранении; ErrAliasConflict, если сгенерированная строка
 //     совпала с чужим алиасом; ErrSiteExists, если длинный URL уже сокращен;
 //     системная ошибка при сбое записи на диск.
-func (r *MapRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
+func (r *MapRepository) StoreSite(site model.Site) (model.ShortURL, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	// 1. Проверяем коллизию сгенерированного короткого алиаса по индексу sites за O(1).
 	// Если такой буквенно-цифровой код уже занят другим сайтом, возвращаем ошибку коллизии,
 	// чтобы сервис Shortner мог уйти на следующий круг генерации строки.
-	if _, ok := r.sites[site.ShortUrl]; ok {
+	if _, ok := r.sites[site.ShortURL]; ok {
 		return "", ErrAliasConflict
 	}
 
 	// 2. Быстрая проверка уникальности оригинального Url по хэш-индексу urls за O(1).
 	// Если URL уже сокращен (в текущем или параллельном запросе), мы атомарно
 	// извлекаем и возвращаем его старый алиас вместе с ошибкой ErrSiteExists.
-	if existingSite, ok := r.urls[site.Url]; ok {
-		return existingSite.ShortUrl, ErrSiteExists
+	if existingSite, ok := r.urls[site.URL]; ok {
+		return existingSite.ShortURL, ErrSiteExists
 	}
 
 	// 3. Если проверки пройдены, создаем изолированную копию структуры в куче
@@ -167,7 +167,7 @@ func (r *MapRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
 
 	// 4. Если персистентность отключена (RAM-режим для бенчмарков), завершаем операцию
 	if r.file == nil {
-		return site.ShortUrl, nil
+		return site.ShortURL, nil
 	}
 
 	// 5. Синхронизируем состояние RAM-памяти с диском.
@@ -176,13 +176,13 @@ func (r *MapRepository) StoreSite(site model.Site) (model.ShortUrl, error) {
 		return "", err
 	}
 
-	return site.ShortUrl, nil
+	return site.ShortURL, nil
 }
 
 // BatchStoreSites атомарно сохраняет пачку сайтов в оперативную память.
 // Метод полностью защищает от параллельных Race Conditions между пользователями
 // и на месте разрешает коллизии токенов, изменяя исходный массив для корректного ответа сервиса.
-func (r *MapRepository) BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortUrl) error {
+func (r *MapRepository) BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortURL) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
@@ -192,14 +192,14 @@ func (r *MapRepository) BatchStoreSites(ctx context.Context, sites []model.Site,
 			return fmt.Errorf("in_memory: batch context canceled: %w", err)
 		}
 
-		if existingSite, exists := r.urls[sites[i].Url]; exists {
-			sites[i].ShortUrl = existingSite.ShortUrl
+		if existingSite, exists := r.urls[sites[i].URL]; exists {
+			sites[i].ShortURL = existingSite.ShortURL
 			continue
 		}
 
 		// Защита от коллизии токена с проверкой контекста внутри
 		for {
-			if _, exists := r.sites[sites[i].ShortUrl]; !exists {
+			if _, exists := r.sites[sites[i].ShortURL]; !exists {
 				break
 			}
 
@@ -208,7 +208,7 @@ func (r *MapRepository) BatchStoreSites(ctx context.Context, sites []model.Site,
 				return fmt.Errorf("in_memory: token generation context canceled: %w", err)
 			}
 
-			sites[i].ShortUrl = genAlias()
+			sites[i].ShortURL = genAlias()
 		}
 
 		sitePtr := &sites[i]
@@ -227,7 +227,7 @@ func (r *MapRepository) BatchStoreSites(ctx context.Context, sites []model.Site,
 // СТАЛО: Мгновенное извлечение значения из хэш-индекса r.urls за время O(1).
 // Метод защищен RLock, что исключает деградацию производительности E2E-бенчмарков
 // на этапе проверки дубликатов в сервисе сокращателя ссылок.
-func (r *MapRepository) GetByUrl(url model.Url) (model.Site, error) {
+func (r *MapRepository) GetByURL(url model.URL) (model.Site, error) {
 	r.mutex.RLock() // Разрешаем параллельное конкурентное чтение
 	defer r.mutex.RUnlock()
 
@@ -278,8 +278,8 @@ func (r *MapRepository) GetByUser(authorID uuid.UUID) ([]model.UserSitesResponse
 	for _, alias := range aliases {
 		if sitePtr, exists := r.sites[alias]; exists {
 			result = append(result, model.UserSitesResponseItem{
-				Alias: sitePtr.ShortUrl,
-				URL:   sitePtr.Url,
+				Alias: sitePtr.ShortURL,
+				URL:   sitePtr.URL,
 			})
 		}
 	}
@@ -293,7 +293,7 @@ func (r *MapRepository) GetByUser(authorID uuid.UUID) ([]model.UserSitesResponse
 // Операция защищена эксклюзивным Mutex, так как происходит модификация данных.
 // Если в процессе выполнения контекст ctx отменяется или истекает его таймаут,
 // метод немедленно прерывает операцию и возвращает ошибку контекста.
-func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error {
+func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortURL, user model.User) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (r *MapRepository) Delete(ctx context.Context, aliases []model.ShortUrl, us
 
 		// Поскольку r.sites хранит указатели, мы модифицируем флаг
 		// напрямую в объекте кучи без необходимости перезаписывать мапу
-		if sitePtr, exists := r.sites[alias]; exists && sitePtr.UserId == user.ID && !sitePtr.DeletedFlag {
+		if sitePtr, exists := r.sites[alias]; exists && sitePtr.UserID == user.ID && !sitePtr.DeletedFlag {
 			sitePtr.DeletedFlag = true
 			changed = true
 		}

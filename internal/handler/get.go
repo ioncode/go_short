@@ -15,14 +15,14 @@ import (
 
 // GetService определяет интерфейс для поиска сайта по короткому алиасу.
 type GetService interface {
-	Get(alias model.ShortUrl) (model.Site, error)
+	Get(alias model.ShortURL) (model.Site, error)
 }
 
 // Get обрабатывает HTTP-запросы GET /{alias} для редиректа на оригинальный URL.
 func Get(s GetService) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		path := chi.URLParam(req, "alias")
-		alias := model.ShortUrl(path)
+		alias := model.ShortURL(path)
 		site, err := s.Get(alias)
 		if err != nil {
 			http.Error(res, string(alias)+": "+err.Error(), http.StatusBadRequest)
@@ -35,15 +35,15 @@ func Get(s GetService) http.HandlerFunc {
 		}
 
 		audit.SetAction(req, audit.ActionFollow)
-		audit.SetURL(req, string(site.Url))
+		audit.SetURL(req, string(site.URL))
 
-		http.Redirect(res, req, string(site.Url), http.StatusTemporaryRedirect)
+		http.Redirect(res, req, string(site.URL), http.StatusTemporaryRedirect)
 	}
 }
 
 // GetByUser определяет интерфейс для получения списка всех сайтов конкретного пользователя.
 type GetByUser interface {
-	GetByUser(userId uuid.UUID) ([]model.UserSitesResponseItem, error)
+	GetByUser(userID uuid.UUID) ([]model.UserSitesResponseItem, error)
 }
 
 // GetUserSites возвращает JSON-список всех сокращенных ссылок авторизованного пользователя.
@@ -74,7 +74,7 @@ func GetUserSites(s GetByUser, shortBaseURL *url.URL, codec *httpcodec.Codec) ht
 		// Используем цикл по индексу для оптимизации
 		for i := range records {
 			u.Path = string(records[i].Alias)
-			records[i].Alias = model.ShortUrl(u.String())
+			records[i].Alias = model.ShortURL(u.String())
 		}
 
 		// Потоковая отправка JSON-ответа из пула буферов.

@@ -13,10 +13,10 @@ import (
 func Benchmark_E2E_Get_Alias(b *testing.B) {
 	env := initBenchEnv(b)
 
-	targetAlias := model.ShortUrl("yandex")
+	targetAlias := model.ShortURL("yandex")
 	_, err := env.Repo.StoreSite(model.Site{
-		ShortUrl: targetAlias,
-		Url:      "https://yandex.ru",
+		ShortURL: targetAlias,
+		URL:      "https://yandex.ru",
 	})
 	if err != nil {
 		b.Fatalf("ошибка подготовки данных: %v", err)
@@ -58,9 +58,9 @@ func Benchmark_E2E_GetUserSites(b *testing.B) {
 	for i := 1; i <= 5; i++ {
 		idxStr := strconv.Itoa(i)
 		_, err := env.Repo.StoreSite(model.Site{
-			ShortUrl: model.ShortUrl("get_user_alias_" + idxStr),
-			Url:      model.Url("https://get-user-sites.com" + idxStr),
-			UserId:   env.UserID,
+			ShortURL: model.ShortURL("get_user_alias_" + idxStr),
+			URL:      model.URL("https://get-user-sites.com" + idxStr),
+			UserID:   env.UserID,
 		})
 		if err != nil {
 			b.Fatalf("ошибка наполнения базы: %v", err)

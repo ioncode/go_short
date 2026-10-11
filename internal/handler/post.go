@@ -15,7 +15,7 @@ import (
 
 // ShortService определяет интерфейс для бизнес-логики одиночного сокращения ссылок.
 type ShortService interface {
-	Short(url model.Url, user model.User) (model.ShortUrl, error)
+	Short(url model.URL, user model.User) (model.ShortURL, error)
 }
 
 // BatchShortService определяет интерфейс для бизнес-логики пакетного сокращения ссылок.
@@ -46,7 +46,7 @@ func Post(s ShortService, shortBaseURL *url.URL, codec *httpcodec.Codec) http.Ha
 			return
 		}
 
-		alias, err := s.Short(model.Url(rawURL), model.User{ID: userID})
+		alias, err := s.Short(model.URL(rawURL), model.User{ID: userID})
 		respStatus := http.StatusCreated
 		if err != nil {
 			if errors.Is(err, repository.ErrSiteExists) {
@@ -154,7 +154,7 @@ func APIPostBatch(s BatchShortService, shortBaseURL *url.URL, codec *httpcodec.C
 		// Выполняем фильтрацию и валидацию данных, подготовленных хендлером
 		var validItems []model.BatchPostRequestItem
 		for i := range items {
-			if items[i].CorrelationId != "" && items[i].URL != "" {
+			if items[i].CorrelationID != "" && items[i].URL != "" {
 				validItems = append(validItems, items[i])
 			}
 		}
@@ -182,7 +182,7 @@ func APIPostBatch(s BatchShortService, shortBaseURL *url.URL, codec *httpcodec.C
 		u := *shortBaseURL
 		for i := range response {
 			u.Path = string(response[i].Alias)
-			response[i].Alias = model.ShortUrl(u.String())
+			response[i].Alias = model.ShortURL(u.String())
 		}
 
 		// 4. Запись ответа

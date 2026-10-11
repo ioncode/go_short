@@ -39,19 +39,19 @@ func stringWithCharset(length int) string {
 
 // repo interface to interact with storage
 type SiteRepository interface {
-	GetByAlias(alias model.ShortUrl) (model.Site, error)
-	StoreSite(site model.Site) (model.ShortUrl, error)
-	GetByUrl(url model.Url) (model.Site, error)
+	GetByAlias(alias model.ShortURL) (model.Site, error)
+	StoreSite(site model.Site) (model.ShortURL, error)
+	GetByURL(url model.URL) (model.Site, error)
 	Ping(ctx context.Context) error
 	Close() error
-	BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortUrl) error
+	BatchStoreSites(ctx context.Context, sites []model.Site, genAlias func() model.ShortURL) error
 	GetByUser(authorID uuid.UUID) ([]model.UserSitesResponseItem, error)
-	Delete(ctx context.Context, aliases []model.ShortUrl, user model.User) error
+	Delete(ctx context.Context, aliases []model.ShortURL, user model.User) error
 }
 
 type DeleteTask struct {
 	Author  model.User
-	Aliases []model.ShortUrl
+	Aliases []model.ShortURL
 }
 
 // service struct
@@ -83,7 +83,7 @@ func (s *Shortner) Enqueue(task DeleteTask) {
 	s.taskChan <- task
 }
 
-func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
+func (s *Shortner) Get(alias model.ShortURL) (model.Site, error) {
 	return s.repository.GetByAlias(alias)
 }
 
@@ -101,17 +101,17 @@ func (s *Shortner) Get(alias model.ShortUrl) (model.Site, error) {
 //   - model.ShortUrl: сгенерированный или уже существующий короткий алиас (например, "aB34ef7X").
 //   - error: nil при успехе; repository.ErrSiteExists при дубликате оригинального URL;
 //     системная ошибка, если лимит попыток исчерпан или недоступно хранилище.
-func (s *Shortner) Short(url model.Url, user model.User) (model.ShortUrl, error) {
+func (s *Shortner) Short(url model.URL, user model.User) (model.ShortURL, error) {
 	// Запускаем цикл оптимистичной вставки с лимитом итераций (Go 1.22+ синтаксис).
 	// Fail-Fast: защищает горутину от зависания и DoS-эффекта при системных сбоях.
 	for range maxShortenRetries {
 		// Генерируем случайный текстовый идентификатор на стеке горутины
-		alias := model.ShortUrl(stringWithCharset(8))
+		alias := model.ShortURL(stringWithCharset(8))
 
 		site := model.Site{
-			Url:      url,
-			ShortUrl: alias,
-			UserId:   user.ID,
+			URL:      url,
+			ShortURL: alias,
+			UserID:   user.ID,
 		}
 
 		// Выполняем строго один атомарный запрос к репозиторию.
@@ -157,20 +157,20 @@ func (s *Shortner) BatchShort(ctx context.Context, items []model.BatchPostReques
 	newSites := make([]model.Site, len(items))
 	for i := range items {
 		// Генерируем случайный текстовый идентификатор оптимистично на стеке горутины
-		alias := model.ShortUrl(stringWithCharset(8))
+		alias := model.ShortURL(stringWithCharset(8))
 
 		newSites[i] = model.Site{
-			CorrelationId: items[i].CorrelationId,
-			Url:           items[i].URL,
-			ShortUrl:      alias,
-			UserId:        user.ID,
+			CorrelationID: items[i].CorrelationID,
+			URL:           items[i].URL,
+			ShortURL:      alias,
+			UserID:        user.ID,
 		}
 	}
 
 	// 2. Передаем функцию генерации как легковесное замыкание (Слои архитектуры сохраняются).
 	// Репозиторий вызовет её как «черный ящик» только в случае редчайшего совпадения токенов в базе.
-	gen := func() model.ShortUrl {
-		return model.ShortUrl(stringWithCharset(8))
+	gen := func() model.ShortURL {
+		return model.ShortURL(stringWithCharset(8))
 	}
 
 	// 3. Отправляем ВСЮ пачку в репозиторий за один атомарный вызов.
@@ -187,8 +187,8 @@ func (s *Shortner) BatchShort(ctx context.Context, items []model.BatchPostReques
 	responseItems := make([]model.BatchPostResponseItem, len(items))
 	for i := range newSites {
 		responseItems[i] = model.BatchPostResponseItem{
-			CorrelationId: newSites[i].CorrelationId,
-			Alias:         newSites[i].ShortUrl,
+			CorrelationID: newSites[i].CorrelationID,
+			Alias:         newSites[i].ShortURL,
 		}
 	}
 

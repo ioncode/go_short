@@ -3,29 +3,31 @@ package model
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // short url
-type ShortUrl string
+type ShortURL string
 
 // long url
-type Url string
+type URL string
 
-func (u *Url) UnmarshalJSON(data []byte) error {
+func (u *URL) UnmarshalJSON(data []byte) error {
 	var rawString string
 	if err := json.Unmarshal(data, &rawString); err != nil {
 		return err
 	}
 	processed := strings.ToLower(rawString)
-	*u = Url(processed)
+	*u = URL(processed)
 	return nil
 }
 
 // site
 type Site struct {
-	Url           Url
-	ShortUrl      ShortUrl
-	CorrelationId string
-	UserId        string
+	URL           URL
+	ShortURL      ShortURL
+	CorrelationID string
+	UserID        uuid.UUID
 	DeletedFlag   bool
 }

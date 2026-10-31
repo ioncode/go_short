@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"testing"
 
@@ -19,10 +20,10 @@ import (
 
 func Test_main(t *testing.T) {
 	// запускаем тестовый сервер, будет выбран первый свободный порт
-
-	router, repo := router.SetupRouter(config.Config{
+	shortBaseURL, _ := url.Parse("http://localhost:8080/")
+	router, repo, _ := router.SetupRouter(context.Background(), &config.Config{
 		ServerAddress: ":8080",
-		ShortBaseUrl:  "http://localhost:8080/",
+		ShortBaseURL:  shortBaseURL,
 		StoragePath:   "test_storage.json",
 	})
 	srv := httptest.NewServer(router)
@@ -31,9 +32,9 @@ func Test_main(t *testing.T) {
 		// останавливаем сервер после завершения теста
 		srv.Close()
 		//закрываем репозиторий
-		repo.Close()
+		_ = repo.Close()
 		//удаляем файл хранения
-		os.Remove("test_storage.json")
+		_ = os.Remove("test_storage.json")
 	})
 
 	//save site for reading in tests
@@ -45,7 +46,6 @@ func Test_main(t *testing.T) {
 	assert.NoError(t, err, "error making HTTP request for store site")
 	body := string(resp.Body())
 	alias := body[len(body)-8:]
-	log.Println(alias)
 
 	tests := []struct {
 		name                    string
@@ -167,10 +167,11 @@ func Test_main(t *testing.T) {
 				req.SetHeader("Accept-Encoding", tt.expectedContentEncoding)
 			}
 			req.URL = srv.URL + tt.path
-			log.Println("Performing resty request to URL", req.URL)
 
 			resp, err := req.Send()
-			defer resp.RawBody().Close()
+			defer func() {
+				_ = resp.RawBody().Close()
+			}()
 			if !errors.Is(err, resty.ErrAutoRedirectDisabled) {
 				assert.NoError(t, err, "error making HTTP request")
 			}
@@ -193,13 +194,13 @@ func Test_main(t *testing.T) {
 			if tt.expectedContentEncoding == "gzip" && tt.expectedBody != "" {
 				gzipReader, err := gzip.NewReader(resp.RawBody())
 				assert.NoError(t, err, "error reading gzipped response")
-				defer gzipReader.Close()
+				defer func() {
+					_ = gzipReader.Close()
+				}()
 				unzippedData, err := io.ReadAll(gzipReader)
 				assert.NoError(t, err, "error reading unGzipped data")
-				log.Println("Decommpressed response data", string(unzippedData))
 				assert.Equal(t, tt.expectedBody, string(unzippedData))
 			} else if tt.expectedBody != "" {
-				log.Println("Resp status", resp.StatusCode(), req.Header, resp.RawResponse, resp.Body())
 				assert.Equal(t, tt.expectedBody, string(resp.Body()))
 			}
 		})

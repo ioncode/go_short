@@ -3,6 +3,7 @@ package handler_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -29,7 +30,11 @@ func ExampleAPIPostBatch() {
 
 	// Выполняем запрос (Имитация для корректной работы кнопки Run в песочнице godoc)
 	// В реальном коде здесь будет: resp, err := http.DefaultClient.Do(req)
-	resp, body := simulateBatchResponse(req, jsonPayload)
+	resp := simulateBatchResponse(req, jsonPayload)
+	defer resp.Body.Close() // Закрываем тело ответа для удовлетворения линтера
+
+	// Читаем данные из тела ответа, как в реальном коде
+	body, _ := io.ReadAll(resp.Body)
 
 	// 3. Выводим результаты для документации пакета
 	fmt.Printf("HTTP Method: %s\n", req.Method)
@@ -46,14 +51,16 @@ func ExampleAPIPostBatch() {
 
 // simulateBatchResponse исключительно для прохождения песочницы имитирует ответ сервера,
 // чтобы убрать сетевой dial tcp timeout при нажатии Run.
-func simulateBatchResponse(req *http.Request, payload []byte) (*http.Response, []byte) {
+func simulateBatchResponse(req *http.Request, payload []byte) *http.Response {
+	// Возвращаем валидный JSON-ответ с переводом строки на конце
+	mockBody := []byte(`[{"correlation_id":"req-1","alias":"http://localhost:8080/batch1"},{"correlation_id":"req-2","alias":"http://localhost:8080/batch2"}]` + "\n")
+
 	resp := &http.Response{
 		StatusCode: http.StatusCreated,
 		Header:     make(http.Header),
+		// Орачиваем байты в ReadCloser, чтобы соответствовать интерфейсу и закрывать поток без ошибок
+		Body: io.NopCloser(bytes.NewReader(mockBody)),
 	}
 	resp.Header.Set("Content-Type", "application/json")
-
-	// Возвращаем валидный JSON-ответ с переводом строки на конце
-	mockBody := []byte(`[{"correlation_id":"req-1","alias":"http://localhost:8080/batch1"},{"correlation_id":"req-2","alias":"http://localhost:8080/batch2"}]` + "\n")
-	return resp, mockBody
+	return resp
 }

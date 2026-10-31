@@ -62,11 +62,11 @@ func ExampleGetUserSites() {
 	fmt.Printf("HTTP Method: %s\n", req.Method)
 	fmt.Printf("HTTP Status: %d\n", resp.StatusCode)
 	fmt.Printf("Content-Type: %s\n", resp.Header.Get("Content-Type"))
-	fmt.Printf("JSON Response: %s\n", string(body))
+	fmt.Printf("JSON Response: %s", string(body))
 
 	// Output:
 	// HTTP Method: GET
 	// HTTP Status: 200
 	// Content-Type: application/json
-	// JSON Response: [{"alias":"http://localhost:8080/61a03f","url":"https://google.com"},{"alias":"http://localhost:8080/82f11b","url":"https://yandex.ru"}\n]
+	// JSON Response: [{"alias":"http://localhost:8080/61a03f","url":"https://google.com"},{"alias":"http://localhost:8080/82f11b","url":"https://yandex.ru"}]
 }

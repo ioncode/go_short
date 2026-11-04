@@ -160,9 +160,6 @@ func BenchmarkFileObserver_Parallel(b *testing.B) {
 
 	ctx := context.Background()
 
-	b.ResetTimer()
-
-	// Запуск параллельного тестирования воркеров
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			observer.OnRequest(ctx, event)

@@ -79,8 +79,6 @@ func Benchmark_E2E_DeleteUserSites(b *testing.B) {
 func Benchmark_DeleteUserSitesParallel(b *testing.B) {
 	env := initBenchEnv(b)
 
-	b.ResetTimer()
-	// Запускаем тест параллельно на всех 12 потоках процессора Ryzen 5 5600X
 	b.RunParallel(func(pb *testing.PB) {
 		var counter uint64
 		rawBuf := make([]byte, 0, 128)

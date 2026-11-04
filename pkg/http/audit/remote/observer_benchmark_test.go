@@ -76,7 +76,6 @@ func BenchmarkRemoteObserver_Parallel(b *testing.B) {
 	}
 
 	ctx := context.Background()
-	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

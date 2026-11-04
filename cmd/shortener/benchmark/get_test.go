@@ -25,7 +25,6 @@ func Benchmark_E2E_Get_Alias(b *testing.B) {
 	res := httptest.NewRecorder()
 	path := "/" + string(targetAlias)
 
-	b.ResetTimer()
 	for b.Loop() {
 		resetRecorder(res)
 		req, err := http.NewRequestWithContext(env.Ctx, http.MethodGet, path, nil)
@@ -69,7 +68,6 @@ func Benchmark_E2E_GetUserSites(b *testing.B) {
 
 	res := httptest.NewRecorder()
 
-	b.ResetTimer()
 	for b.Loop() {
 		resetRecorder(res)
 		req, err := http.NewRequestWithContext(env.Ctx, http.MethodGet, "/api/user/urls", nil)

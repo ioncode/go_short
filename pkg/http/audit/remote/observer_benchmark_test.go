@@ -47,7 +47,6 @@ func BenchmarkRemoteObserver_SingleThread(b *testing.B) {
 	}
 
 	ctx := context.Background()
-	b.ResetTimer()
 
 	for b.Loop() {
 		observer.OnRequest(ctx, event)

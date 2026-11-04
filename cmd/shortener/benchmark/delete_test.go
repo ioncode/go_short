@@ -37,7 +37,6 @@ func Benchmark_E2E_DeleteUserSites(b *testing.B) {
 	// Вводим локальный счетчик с правильным типом uint64 для динамического Payload
 	var counter uint64
 
-	b.ResetTimer()
 	for b.Loop() {
 		counter++
 

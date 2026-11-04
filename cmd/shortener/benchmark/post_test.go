@@ -19,7 +19,6 @@ func Benchmark_E2E_Post_Text(b *testing.B) {
 	var counter uint64
 	res := httptest.NewRecorder()
 
-	b.ResetTimer()
 	for b.Loop() {
 		counter++
 		// Быстрый сброс длины слайса до базового префикса
@@ -47,7 +46,6 @@ func Benchmark_E2E_Post_JSON(b *testing.B) {
 	var counter uint64
 	res := httptest.NewRecorder()
 
-	b.ResetTimer()
 	for b.Loop() {
 		counter++
 

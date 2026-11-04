@@ -124,9 +124,8 @@ func BenchmarkPayload_Lifecycle(b *testing.B) {
 
 	rec := httptest.NewRecorder()
 
-	b.ResetTimer()
 	b.ReportAllocs() // Включаем детальный отчет об аллокациях памяти
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		h.ServeHTTP(rec, req)
 	}
 }
@@ -145,9 +144,8 @@ func BenchmarkNative_ContextLifecycle(b *testing.B) {
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	testID := uuid.New()
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// 1. Слой авторизации создает новый контекст
 		ctx1 := context.WithValue(req.Context(), nativeUserKey, testID)
 
@@ -190,9 +188,8 @@ func BenchmarkPayload_HTTP_Lifecycle(b *testing.B) {
 	// Собираем сквозной конвейер. payload.Middleware ВСЕГДА стоит первой!
 	pipeline := payload.Middleware(authMiddleware(auditMiddleware(handler)))
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		pipeline.ServeHTTP(rec, req)
 	}
 }
@@ -228,9 +225,8 @@ func BenchmarkNative_HTTP_Lifecycle(b *testing.B) {
 	// Собираем нативный конвейер
 	pipeline := authMiddleware(auditMiddleware(handler))
 
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		pipeline.ServeHTTP(rec, req)
 	}
 }
@@ -272,7 +268,6 @@ func runPayloadDepthBenchmark(b *testing.B, depth int) {
 	// Payload.Middleware ВСЕГДА стоит самой первой и вызывается ОДИН РАЗ
 	finalPipeline := payload.Middleware(pipeline)
 
-	b.ResetTimer()
 	b.ReportAllocs()
 	for b.Loop() {
 		finalPipeline.ServeHTTP(rec, req)
@@ -311,7 +306,6 @@ func runNativeDepthBenchmark(b *testing.B, depth int) {
 		}(pipeline, key) // Пробрасываем key как аргумент
 	}
 
-	b.ResetTimer()
 	b.ReportAllocs()
 	for b.Loop() {
 		pipeline.ServeHTTP(rec, req)

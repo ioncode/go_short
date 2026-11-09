@@ -39,6 +39,14 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Serve запускает основной HTTP-сервер утилиты сокращения ссылок и блокирует поток
+// выполнения до получения системного сигнала отмены или возникновения критической ошибки.
+//
+// Функция оркеструет параллельный запуск веб-компонентов приложения с помощью
+// errgroup.WithContext, обеспечивая деградацию и плавную остановку (Graceful Shutdown)
+// HTTP-сервера и подсистемы аудита в течение 5 секунд после отмены контекста.
+// Применяет оптимизацию middleware логирования на этапе инициализации в зависимости
+// от установленного в конфигурации уровня логирования.
 func Serve(ctx context.Context, config *config.Config) error {
 	router, repo, auditor := SetupRouter(ctx, config)
 	defer func() {
@@ -94,6 +102,21 @@ func Serve(ctx context.Context, config *config.Config) error {
 	return eg.Wait()
 }
 
+// SetupRouter выполняет сквозную конфигурацию и сборку инфраструктурных компонентов
+// веб-слоя микросервиса.
+//
+// Функция решает следующие архитектурные задачи:
+//  1. Инициализирует пул соединений к СУБД Postgres с тюнингом SetMaxOpenConns,
+//     SetMaxIdleConns и ConnMaxLifetime или откатывается на in-memory репозиторий.
+//  2. Конфигурирует защищенную сессионную куку аутентификации securecookie с бинарной
+//     сериализацией UUID без накладных расходов пакета encoding/gob.
+//  3. Регистрирует наблюдателей файлового и сетевого асинхронного аудита в подсистеме.
+//  4. Настраивает кодек httpcodec v0.0.4 с лимитом тела запроса в 8 КБ для превентивной
+//     DoS-защиты периметра и ограничивает капы буферов выделения памяти во избежание OOM.
+//  5. Формирует цепочку глобальных Middleware и монтирует эндпоинты API.
+//
+// Возвращает готовый к работе http.Handler, интерфейс хранилища и инстанс аудитора
+// для последующего контроля их жизненного цикла.
 func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, service.SiteRepository, *audit.Auditor) {
 	var repo service.SiteRepository
 	if config.DataBaseDSN == "" {
@@ -128,7 +151,7 @@ func SetupRouter(ctx context.Context, config *config.Config) (http.Handler, serv
 	sc := securecookie.New(hashKey, nil)
 
 	// КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: полностью отключаем Gob.
-	// Теперь securecookie работает со бинарным UUID напрямую!
+	// Теперь securecookie работает с бинарным UUID напрямую!
 	sc.SetSerializer(pkg.UUIDCodec{})
 
 	authMiddleware := auth.NewAuthMiddleware(sc)

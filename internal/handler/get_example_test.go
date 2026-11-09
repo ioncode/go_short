@@ -19,10 +19,10 @@ func ExampleGetUserSites() {
 
 	// 2. Эмулируем поведение эндпоинта GET /api/user/urls для прохождения песочницы godoc
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Описываем структуру ответа локально, чтобы не завязываться на internal/model
+		// Описываем структуру ответа локально в полном соответствии с моделью model.UserSitesResponseItem
 		type userSitesResponseItem struct {
-			Alias string `json:"alias"`
-			URL   string `json:"url"`
+			Alias string `json:"short_url"`
+			URL   string `json:"original_url"`
 		}
 
 		// Имитируем данные из базы данных
@@ -68,5 +68,5 @@ func ExampleGetUserSites() {
 	// HTTP Method: GET
 	// HTTP Status: 200
 	// Content-Type: application/json
-	// JSON Response: [{"alias":"http://localhost:8080/61a03f","url":"https://google.com"},{"alias":"http://localhost:8080/82f11b","url":"https://yandex.ru"}]
+	// JSON Response: [{"short_url":"http://localhost:8080/61a03f","original_url":"https://google.com"},{"short_url":"http://localhost:8080/82f11b","original_url":"https://yandex.ru"}]
 }

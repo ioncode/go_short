@@ -13,13 +13,13 @@ import (
 	"github.com/ioncode/httpcodec"
 )
 
-// GetService определяет интерфейс для поиска сайта по короткому алиасу.
-type GetService interface {
+// Fetcher определяет интерфейс для поиска сайта по короткому алиасу.
+type Fetcher interface {
 	Get(alias model.ShortURL) (model.Site, error)
 }
 
 // Get обрабатывает HTTP-запросы GET /{alias} для редиректа на оригинальный URL.
-func Get(s GetService) http.HandlerFunc {
+func Get(s Fetcher) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		path := chi.URLParam(req, "alias")
 		alias := model.ShortURL(path)
@@ -41,8 +41,8 @@ func Get(s GetService) http.HandlerFunc {
 	}
 }
 
-// GetByUser определяет интерфейс для получения списка всех сайтов конкретного пользователя.
-type GetByUser interface {
+// UserLinksFetcher определяет интерфейс для получения списка всех сайтов конкретного пользователя.
+type UserLinksFetcher interface {
 	GetByUser(userID uuid.UUID) ([]model.UserSitesResponseItem, error)
 }
 
@@ -51,7 +51,7 @@ type GetByUser interface {
 // Метод полностью оптимизирован: сериализация массива records
 // и отправка структурированных JSON-ошибок переведены на метод codec.WriteJSON.
 // Использование jsonPool библиотеки полностью обнуляет накладные расходы на маршалинг ответа.
-func GetUserSites(s GetByUser, shortBaseURL *url.URL, codec *httpcodec.Codec) http.HandlerFunc {
+func GetUserSites(s UserLinksFetcher, shortBaseURL *url.URL, codec *httpcodec.Codec) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		userID, err := auth.UserIDFromContext(req.Context())
 		if err != nil {

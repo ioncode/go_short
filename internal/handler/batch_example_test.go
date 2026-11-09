@@ -11,10 +11,10 @@ import (
 //
 // Метод отправляет JSON-массив с оригинальными URL и получает в ответ массив с готовыми короткими ссылками.
 func ExampleAPIPostBatch() {
-	// 1. Формируем входящий JSON-массив (батч)
+	// 1. Формируем входящий JSON-массив (батч) с полем "original_url"
 	jsonPayload := []byte(`[
-		{"correlation_id": "req-1", "url": "https://google.com"},
-		{"correlation_id": "req-2", "url": "https://yandex.ru"}
+		{"correlation_id": "req-1", "original_url": "https://google.com"},
+		{"correlation_id": "req-2", "original_url": "https://yandex.ru"}
 	]`)
 
 	// Адрес вашего запущенного сервиса сокращения ссылок
@@ -46,19 +46,19 @@ func ExampleAPIPostBatch() {
 	// HTTP Method: POST
 	// HTTP Status: 201
 	// Content-Type: application/json
-	// JSON Response: [{"correlation_id":"req-1","alias":"http://localhost:8080/batch1"},{"correlation_id":"req-2","alias":"http://localhost:8080/batch2"}]
+	// JSON Response: [{"short_url":"http://localhost:8080/batch1","correlation_id":"req-1"},{"short_url":"http://localhost:8080/batch2","correlation_id":"req-2"}]
 }
 
 // simulateBatchResponse исключительно для прохождения песочницы имитирует ответ сервера,
 // чтобы убрать сетевой dial tcp timeout при нажатии Run.
 func simulateBatchResponse(req *http.Request, payload []byte) *http.Response {
-	// Возвращаем валидный JSON-ответ с переводом строки на конце
-	mockBody := []byte(`[{"correlation_id":"req-1","alias":"http://localhost:8080/batch1"},{"correlation_id":"req-2","alias":"http://localhost:8080/batch2"}]` + "\n")
+	// Возвращаем валидный JSON-ответ с актуальным полем "short_url" и переводом строки на конце
+	mockBody := []byte(`[{"short_url":"http://localhost:8080/batch1","correlation_id":"req-1"},{"short_url":"http://localhost:8080/batch2","correlation_id":"req-2"}]` + "\n")
 
 	resp := &http.Response{
 		StatusCode: http.StatusCreated,
 		Header:     make(http.Header),
-		// Орачиваем байты в ReadCloser, чтобы соответствовать интерфейсу и закрывать поток без ошибок
+		// Оборачиваем байты в ReadCloser, чтобы соответствовать интерфейсу и закрывать поток без ошибок
 		Body: io.NopCloser(bytes.NewReader(mockBody)),
 	}
 	resp.Header.Set("Content-Type", "application/json")

@@ -39,14 +39,13 @@ func (f *FileObserver) Name() string {
 	return "Файловый приемник"
 }
 
-// OnRequest асинхронно кодирует событие прямо в дескриптор файла.
+// OnRequest сериализует событие в JSON под мьютексом, а логирование выносит за его пределы.
 func (f *FileObserver) OnRequest(ctx context.Context, e Event) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
+	err := f.encoder.Encode(e)
+	f.mu.Unlock() // Освобождаем мьютекс сразу после кодирования
 
-	// Потоковое кодирование: пишем напрямую в дескриптор файла.
-	if err := f.encoder.Encode(e); err != nil {
-		// Записываем лог при ошибке записи или кодирования
+	if err != nil {
 		f.logger.Error("Не удалось записать событие в файл аудита",
 			zap.Error(err),
 			zap.Int64("event_ts", e.TS),

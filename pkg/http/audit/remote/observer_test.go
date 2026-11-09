@@ -121,6 +121,7 @@ func TestRemoteObserver_Lifecycle_Synctest(t *testing.T) {
 		},
 	}
 	observer.client.SetTransport(transport)
+	observer.client.backoffFn = observer.cb.CalculateBackoff
 	ctx := context.Background()
 
 	// Запускаем весь сценарий внутри пузыря synctest.Test.

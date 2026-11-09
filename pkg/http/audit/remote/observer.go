@@ -3,7 +3,6 @@ package remote
 import (
 	"context"
 	"net/url"
-	"time"
 
 	json "github.com/goccy/go-json"
 	"github.com/ioncode/go_short/pkg/http/audit"
@@ -26,9 +25,15 @@ func NewRemoteObserver(targetURL string, logger *zap.Logger) (*RemoteObserver, e
 		return nil, err
 	}
 
+	cb := NewCircuitBreaker()
+
+	// Передаем MaxRetries и функцию CalculateBackoff из CircuitBreaker прямо в клиент!
+	client := NewHTTPClient(targetURL, cb.MaxRetries())
+	client.backoffFn = cb.CalculateBackoff
+
 	return &RemoteObserver{
-		client: NewHTTPClient(targetURL),
-		cb:     NewCircuitBreaker(),
+		client: client,
+		cb:     cb,
 		logger: logger.Named("audit_remote_observer"),
 	}, nil
 }
@@ -43,7 +48,6 @@ func (r *RemoteObserver) OnRequest(ctx context.Context, e audit.Event) {
 		r.logger.Warn("Предохранитель РАЗОМКНУТ. Сетевой запрос пропущен.")
 		return
 	}
-	// Гарантируем очистку слота HALF-OPEN при любом аварийном выходе (в т.ч. отмене контекста)
 	defer r.cb.ReleaseHalfOpenSlot()
 
 	// 2. Быстрый маршалинг лога
@@ -53,48 +57,19 @@ func (r *RemoteObserver) OnRequest(ctx context.Context, e audit.Event) {
 		return
 	}
 
-	// Запоминаем, является ли текущий запрос тестовым
+	// 3. Делегируем отправку и ретраи самодостаточному клиенту
 	isTestRequest := r.cb.IsHalfOpen()
+	sendErr := r.client.SendPostRequest(ctx, payload, isTestRequest)
 
-	maxRetries := r.cb.MaxRetries()
-	var sendErr error
-
-	// 3. Цикл отправки и повторных попыток
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		if ctx.Err() != nil {
-			return
-		}
-
-		sendErr = r.client.SendPostRequest(ctx, payload)
-		if sendErr == nil {
-			r.cb.RecordSuccess(r.logger)
-			return
-		}
-
-		// В состоянии HALF-OPEN запрещены повторные попытки (ретраи). Сбой переводит цепь в OPEN.
-		if isTestRequest {
-			break
-		}
-
-		// Ретраи отрабатывают только для штатного режима CLOSED
-		if attempt < maxRetries-1 {
-			sleepDuration := r.cb.CalculateBackoff(attempt)
-			select {
-			case <-time.After(sleepDuration):
-			case <-ctx.Done():
-				return
-			}
-		}
-	}
-
-	// Фиксируем финальный сбой в стейт-машине, если запрос окончательно провалился
-	if sendErr != nil {
-		r.logger.Error("Сетевая отправка логов завершилась сбоем. Фиксируем ошибку в предохранителе.", zap.Error(sendErr))
+	// 4. Фиксируем результат в стейт-машине предохранителя
+	if sendErr == nil {
+		r.cb.RecordSuccess(r.logger)
+	} else {
+		r.logger.Error("Сетевая отправка логов завершилась сбоем после всех попыток. Фиксируем ошибку в предохранителе.", zap.Error(sendErr))
 		r.cb.RecordFailure(r.logger)
 	}
 }
 
-// Close закрывает свободные сетевые соединения клиента.
 func (r *RemoteObserver) Close() error {
 	r.client.CloseIdleConnections()
 	return nil

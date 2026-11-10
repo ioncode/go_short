@@ -13,40 +13,41 @@ import (
 // HTTPClient инкапсулирует стандартный http.Client и предоставляет механизмы
 // повторных попыток с exponential backoff и переиспользования буферов.
 type HTTPClient struct {
-	client     *http.Client
-	url        string
-	bufPool    sync.Pool
-	maxRetries int
-	backoffFn  func(attempt int) time.Duration // Динамическая функция расчета бэк-оффа
+	client    *http.Client
+	url       string
+	bufPool   sync.Pool
+	backoffFn func(attempt int) time.Duration // Динамическая функция расчета бэк-оффа
 }
 
-// NewHTTPClient инициализирует клиент для работы с указанным целевым URL и настройками ретраев.
-func NewHTTPClient(targetURL string, maxRetries int) *HTTPClient {
+// NewHTTPClient инициализирует клиент для работы с указанным целевым URL.
+// Задает безопасную дефолтную функцию бэк-оффа для предотвращения паник при ретраях.
+func NewHTTPClient(targetURL string) *HTTPClient {
 	return &HTTPClient{
-		url:        targetURL,
-		client:     &http.Client{Timeout: 3 * time.Second},
-		maxRetries: maxRetries,
+		url:    targetURL,
+		client: &http.Client{Timeout: 3 * time.Second},
 		bufPool: sync.Pool{
 			New: func() any {
 				return bytes.NewBuffer(make([]byte, 0, 256))
 			},
 		},
+		// ГАРАНТИЯ БЕЗОПАСНОСТИ: инициализируем дефолтный линейно-экспоненциальный backoff.
+		// Если поле не переопределят снаружи, рантайм больше никогда не упадет по nil-указателю.
+		backoffFn: func(attempt int) time.Duration {
+			return time.Duration(1+attempt*2) * time.Second
+		},
 	}
 }
 
 // SendPostRequest выполняет отправку HTTP POST-запроса с логикой повторных попыток.
-// Если isTestRequest равно true (режим HALF-OPEN в Circuit Breaker), выполняется только 1 попытка.
-func (c *HTTPClient) SendPostRequest(ctx context.Context, payload []byte, isTestRequest bool) error {
+func (c *HTTPClient) SendPostRequest(ctx context.Context, payload []byte, retries int) error {
+	if retries < 1 {
+		retries = 1
+	}
+
 	buf := c.bufPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	buf.Write(payload)
-
 	defer c.bufPool.Put(buf)
-
-	retries := c.maxRetries
-	if isTestRequest {
-		retries = 1 // В режиме HALF-OPEN запрещены повторные попытки
-	}
 
 	var lastErr error
 	for attempt := 0; attempt < retries; attempt++ {
@@ -56,10 +57,10 @@ func (c *HTTPClient) SendPostRequest(ctx context.Context, payload []byte, isTest
 
 		lastErr = c.doSingleRequest(ctx, buf, payload)
 		if lastErr == nil {
-			return nil // Успешная отправка
+			return nil
 		}
 
-		// Если это не последняя попытка, делаем backoff паузу
+		// Защита внутри цикла select теперь подкреплена гарантированным наличием backoffFn
 		if attempt < retries-1 {
 			sleepDuration := c.backoffFn(attempt)
 			timer := time.NewTimer(sleepDuration)
@@ -78,7 +79,6 @@ func (c *HTTPClient) SendPostRequest(ctx context.Context, payload []byte, isTest
 
 // doSingleRequest выполняет одну физическую HTTP-отправку.
 func (c *HTTPClient) doSingleRequest(ctx context.Context, buf *bytes.Buffer, payload []byte) error {
-	// Сбрасываем буфер к началу перед повторным чтением
 	buf.Reset()
 	buf.Write(payload)
 
@@ -93,7 +93,6 @@ func (c *HTTPClient) doSingleRequest(ctx context.Context, buf *bytes.Buffer, pay
 		return err
 	}
 
-	// Вычитываем и закрываем тело для сохранения Keep-Alive сессии
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
 

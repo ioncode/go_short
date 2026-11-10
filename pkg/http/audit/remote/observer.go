@@ -26,9 +26,7 @@ func NewRemoteObserver(targetURL string, logger *zap.Logger) (*RemoteObserver, e
 	}
 
 	cb := NewCircuitBreaker()
-
-	// Передаем MaxRetries и функцию CalculateBackoff из CircuitBreaker прямо в клиент!
-	client := NewHTTPClient(targetURL, cb.MaxRetries())
+	client := NewHTTPClient(targetURL)
 	client.backoffFn = cb.CalculateBackoff
 
 	return &RemoteObserver{
@@ -43,25 +41,25 @@ func (r *RemoteObserver) Name() string { return "Сетевой приемник
 
 // OnRequest маршалит событие через быстрый json.Marshal и отправляет его в сеть.
 func (r *RemoteObserver) OnRequest(ctx context.Context, e audit.Event) {
-	// 1. Проверяем состояние предохранителя
 	if !r.cb.AllowRequest() {
 		r.logger.Warn("Предохранитель РАЗОМКНУТ. Сетевой запрос пропущен.")
 		return
 	}
 	defer r.cb.ReleaseHalfOpenSlot()
 
-	// 2. Быстрый маршалинг лога
 	payload, err := json.Marshal(e)
 	if err != nil {
 		r.logger.Error("Не удалось закодировать событие для отправки", zap.Error(err))
 		return
 	}
 
-	// 3. Делегируем отправку и ретраи самодостаточному клиенту
-	isTestRequest := r.cb.IsHalfOpen()
-	sendErr := r.client.SendPostRequest(ctx, payload, isTestRequest)
+	retries := r.cb.MaxRetries()
+	if r.cb.IsHalfOpen() {
+		retries = 1
+	}
 
-	// 4. Фиксируем результат в стейт-машине предохранителя
+	sendErr := r.client.SendPostRequest(ctx, payload, retries)
+
 	if sendErr == nil {
 		r.cb.RecordSuccess(r.logger)
 	} else {

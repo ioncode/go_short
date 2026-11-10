@@ -72,24 +72,39 @@ func (a *Auditor) Register(o Observer) {
 // не блокируя отправку остальным участникам и основной HTTP-поток.
 func (a *Auditor) Notify(event Event) {
 	a.mu.RLock()
-	defer a.mu.RUnlock()
 
 	select {
 	case <-a.ctx.Done():
+		a.mu.RUnlock()
 		return
 	default:
 	}
+
+	// Аллоцируем небольшой слайс под имена пропущенных приемников, если они будут.
+	// Используем капасити по количеству loops для исключения лишних реаллокаций.
+	var droppedReceivers []string
 
 	for _, loop := range a.loops {
 		select {
 		case loop.queue <- event:
 		default:
-			a.logger.Warn("Очередь приемника переполнена, событие для него пропущено",
-				zap.String("receiver", loop.observer.Name()),
-				zap.String("method", event.Method),
-				zap.String("path", event.Path),
-			)
+			if droppedReceivers == nil {
+				droppedReceivers = make([]string, 0, len(a.loops))
+			}
+			droppedReceivers = append(droppedReceivers, loop.observer.Name())
 		}
+	}
+
+	// Мгновенно отпускаем мьютекс до выполнения операций ввода-вывода (I/O) логгера
+	a.mu.RUnlock()
+
+	// Логируем все пропуски событий вне критической секции
+	for _, receiverName := range droppedReceivers {
+		a.logger.Warn("Очередь приемника переполнена, событие для него пропущено",
+			zap.String("receiver", receiverName),
+			zap.String("method", event.Method),
+			zap.String("path", event.Path),
+		)
 	}
 }
 

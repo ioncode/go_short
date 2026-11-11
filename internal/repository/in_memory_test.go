@@ -1,7 +1,6 @@
 package repository_test
 
 import (
-	"log"
 	"os"
 	"testing"
 
@@ -12,7 +11,7 @@ import (
 func TestMapRepository_GetByUrl(t *testing.T) {
 	tests := []struct {
 		name      string
-		url       model.Url
+		url       model.URL
 		want      model.Site
 		wantError bool
 	}{
@@ -20,8 +19,8 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 			name: "Get stored site",
 			url:  "ya.ru",
 			want: model.Site{
-				Url:      "ya.ru",
-				ShortUrl: "123",
+				URL:      "ya.ru",
+				ShortURL: "123",
 			},
 			wantError: false,
 		},
@@ -29,8 +28,8 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 			name: "Get unstored site",
 			url:  "ya.ru1",
 			want: model.Site{
-				Url:      "ya.ru",
-				ShortUrl: "123",
+				URL:      "ya.ru",
+				ShortURL: "123",
 			},
 			wantError: true,
 		},
@@ -39,12 +38,11 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				log.Println("CleanUp test get by url")
-				r.Close()
-				os.RemoveAll("test_storage.json")
+				_ = r.Close()
+				_ = os.RemoveAll("test_storage.json")
 			})
-			r.StoreSite(tt.want)
-			got, gotError := r.GetByUrl(tt.url)
+			_, _ = r.StoreSite(tt.want)
+			got, gotError := r.GetByURL(tt.url)
 			if gotError != nil {
 				if !tt.wantError {
 					t.Errorf("GetByUrl() failed: %v", gotError)
@@ -64,7 +62,7 @@ func TestMapRepository_GetByUrl(t *testing.T) {
 func TestMapRepository_GetByAlias(t *testing.T) {
 	tests := []struct {
 		name    string
-		alias   model.ShortUrl
+		alias   model.ShortURL
 		want    model.Site
 		wantErr bool
 	}{
@@ -72,8 +70,8 @@ func TestMapRepository_GetByAlias(t *testing.T) {
 			name:  "Get by stored alias",
 			alias: "123",
 			want: model.Site{
-				Url:      "ya.ru",
-				ShortUrl: "123",
+				URL:      "ya.ru",
+				ShortURL: "123",
 			},
 			wantErr: false,
 		},
@@ -81,8 +79,8 @@ func TestMapRepository_GetByAlias(t *testing.T) {
 			name:  "Get by unstored alias",
 			alias: "1234",
 			want: model.Site{
-				Url:      "ya.ru",
-				ShortUrl: "123",
+				URL:      "ya.ru",
+				ShortURL: "123",
 			},
 			wantErr: true,
 		},
@@ -91,11 +89,10 @@ func TestMapRepository_GetByAlias(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				log.Println("CleanUp test get by alias")
-				r.Close()
-				os.RemoveAll("test_storage.json")
+				_ = r.Close()
+				_ = os.RemoveAll("test_storage.json")
 			})
-			r.StoreSite(tt.want)
+			_, _ = r.StoreSite(tt.want)
 			got, gotErr := r.GetByAlias(tt.alias)
 			if gotErr != nil {
 				if !tt.wantErr {
@@ -122,16 +119,16 @@ func TestMapRepository_StoreSite(t *testing.T) {
 		{
 			name: "Store new site",
 			site: model.Site{
-				Url:      "ya.ru",
-				ShortUrl: "123",
+				URL:      "ya.ru",
+				ShortURL: "123",
 			},
 			wantErr: false,
 		},
 		{
 			name: "Store allready stored site",
 			site: model.Site{
-				Url:      "yandex.ru",
-				ShortUrl: "sfdsfgd",
+				URL:      "yandex.ru",
+				ShortURL: "sfdsfgd",
 			},
 			wantErr: true,
 		},
@@ -142,16 +139,15 @@ func TestMapRepository_StoreSite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := repository.NewMapRepository("test_storage.json")
 			t.Cleanup(func() {
-				log.Println("CleanUp test store site")
-				r.Close()
-				os.RemoveAll("test_storage.json")
+				_ = r.Close()
+				_ = os.RemoveAll("test_storage.json")
 			})
-			r.StoreSite(model.Site{
-				Url:      "yandex.ru",
-				ShortUrl: "sfdsfgd",
+			_, _ = r.StoreSite(model.Site{
+				URL:      "yandex.ru",
+				ShortURL: "sfdsfgd",
 			})
 
-			gotErr := r.StoreSite(tt.site)
+			_, gotErr := r.StoreSite(tt.site)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("StoreSite() failed: %v", gotErr)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/ioncode/go_short/internal/model"
 	"github.com/ioncode/go_short/internal/repository"
 	"github.com/ioncode/go_short/internal/service"
@@ -17,23 +18,23 @@ func TestMapShortner_Short(t *testing.T) {
 
 	repo := repository.NewMapRepository("test_storage.json")
 	t.Cleanup(func() {
-		repo.Close()
-		os.RemoveAll("test_storage.json")
+		_ = repo.Close()
+		_ = os.RemoveAll("test_storage.json")
 	})
-	repo.StoreSite(model.Site{
-		Url:      "ya.ru",
-		ShortUrl: "123",
+	_, _ = repo.StoreSite(model.Site{
+		URL:      "ya.ru",
+		ShortURL: "123",
 	})
 	tests := []struct {
 		name    string
 		r       service.SiteRepository
-		Url     model.Url
-		want    model.ShortUrl
+		URL     model.URL
+		want    model.ShortURL
 		wantErr bool
 	}{
 		{
 			name:    "Service with existing site",
-			Url:     "ya.ru",
+			URL:     "ya.ru",
 			want:    "123",
 			wantErr: false,
 			r:       repo,
@@ -43,7 +44,7 @@ func TestMapShortner_Short(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := service.NewShortner(tt.r)
-			got, gotErr := s.Short(tt.Url, model.User{ID: "f2a2f7ef-bfd5-44be-ba21-fc91af79733e"})
+			got, gotErr := s.Short(tt.URL, model.User{ID: uuid.MustParse("f2a2f7ef-bfd5-44be-ba21-fc91af79733e")})
 			if gotErr != nil && !errors.Is(gotErr, repository.ErrSiteExists) {
 				if !tt.wantErr {
 					t.Errorf("Short() failed: %v", gotErr)
@@ -63,18 +64,18 @@ func TestMapShortner_Short(t *testing.T) {
 func TestMapShortner_Get(t *testing.T) {
 	repo := repository.NewMapRepository("test_storage.json")
 	t.Cleanup(func() {
-		repo.Close()
-		os.RemoveAll("test_storage.json")
+		_ = repo.Close()
+		_ = os.RemoveAll("test_storage.json")
 	})
 	site := model.Site{
-		Url:      "ya.ru",
-		ShortUrl: "123",
+		URL:      "ya.ru",
+		ShortURL: "123",
 	}
-	repo.StoreSite(site)
+	_, _ = repo.StoreSite(site)
 	tests := []struct {
 		name    string
 		r       service.SiteRepository
-		alias   model.ShortUrl
+		alias   model.ShortURL
 		want    model.Site
 		wantErr bool
 	}{

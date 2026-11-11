@@ -13,10 +13,10 @@ import (
 // HTTPClient инкапсулирует стандартный http.Client и предоставляет механизмы
 // повторных попыток с exponential backoff и переиспользования буферов.
 type HTTPClient struct {
-	client    *http.Client
-	url       string
-	bufPool   sync.Pool
-	backoffFn func(attempt int) time.Duration // Динамическая функция расчета бэк-оффа
+	bufPool   sync.Pool                       // Вынесли на самый верх (40 байт)
+	client    *http.Client                    // 8 байт
+	backoffFn func(attempt int) time.Duration // 8 байт
+	url       string                          // 16 байт (уходит в самый конец)
 }
 
 // NewHTTPClient инициализирует клиент для работы с указанным целевым URL.

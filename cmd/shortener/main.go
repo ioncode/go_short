@@ -87,7 +87,7 @@ func main() {
 	// g.Wait() каскадно отменит gCtx, запустив внутренний Shutdown для http.Server и Auditor.
 	if err := g.Wait(); err != nil {
 		logger.Log.Error("Приложение остановлено с ошибкой", zap.Error(err))
-		os.Exit(1)
+		return // Исправлено: просто выходим из main, давая отработать defer
 	}
 
 	logger.Log.Info("Приложение корректно остановлено")

@@ -32,8 +32,8 @@ type MapRepository struct {
 	sites    map[model.ShortURL]*model.Site // Индекс для быстрого поиска по короткому алиасу (O(1))
 	urls     map[model.URL]*model.Site      // Индекс для мгновенной проверки уникальности оригинального URL (O(1))
 	userUrls map[uuid.UUID][]model.ShortURL // Индекс для мгновенного получения ссылок конкретного пользователя (O(1))
-	mutex    sync.RWMutex                   // RWMutex для безопасного конкурентного доступа к мапам
 	file     *os.File                       // Дескриптор файла для персистентного хранения данных на диске
+	mutex    sync.RWMutex                   // RWMutex для безопасного конкурентного доступа к мапам
 }
 
 // NewMapRepository создает и инициализирует новый экземпляр MapRepository.

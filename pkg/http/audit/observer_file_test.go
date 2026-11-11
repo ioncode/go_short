@@ -48,13 +48,13 @@ func TestFileObserver_Success(t *testing.T) {
 	observer.OnRequest(context.Background(), event)
 
 	// Закрываем файл, чтобы гарантированно сбросить буферы ОС на диск
-	if err := observer.Close(); err != nil {
+	if err = observer.Close(); err != nil {
 		t.Fatalf("Ошибка при закрытии FileObserver: %v", err)
 	}
 
 	// 4. Читаем записанный файл для проверки содержимого
-	data, err := os.ReadFile(logPath)
-	if err != nil {
+	data, readErr := os.ReadFile(logPath)
+	if readErr != nil {
 		t.Fatalf("Не удалось прочитать созданный файл лога: %v", err)
 	}
 
@@ -101,8 +101,8 @@ func TestFileObserver_Close_ErrorHandling(t *testing.T) {
 
 	// Повторный вызов Close() на уже закрытом файле должен вернуть ошибку операционной системы,
 	// но рантайм Go не должен паниковать (вызывать panic)
-	err = observer.Close()
-	if err == nil {
+	closeErr := observer.Close()
+	if closeErr == nil {
 		t.Error("Ожидалась ошибка при повторном закрытии дескриптора файла, но метод вернул nil")
 	}
 }

@@ -11,7 +11,7 @@
 // Примеры команд для сборки и запуска:
 //
 //	# Сборка анализатора
-//	go build -o staticlint ./cmd/staticlint/main.go
+//	go build -o staticlint ./cmd/staticlint
 //
 //	# Запуск проверки для всего текущего проекта (включая подпакеты)
 //	./staticlint ./...
@@ -40,11 +40,10 @@
 //
 // 4. Собственный анализатор (osexit):
 //   - Запрещает использовать прямой вызов функции `os.Exit` внутри функции `main` пакета `main`.
-//   - Игнорирует вызовы os.Exit в тестовых файтах (*_test.go) и в любых других функциях, кроме main.main.
+//   - Игнорирует вызовы os.Exit в тестовых файлах (*_test.go) и в любых других функциях, кроме main.main.
 package main
 
 import (
-	"go/ast"
 	"strings"
 
 	"github.com/kisielk/errcheck/errcheck"
@@ -107,13 +106,6 @@ import (
 	"honnef.co/go/tools/staticcheck"
 )
 
-// OsExitAnalyzer — собственный анализатор, запрещающий os.Exit в main.main.
-var OsExitAnalyzer = &analysis.Analyzer{
-	Name: "osexit",
-	Doc:  "restricts direct calls to os.Exit in main function of main package",
-	Run:  runOsExit,
-}
-
 func main() {
 	var mychecks []*analysis.Analyzer
 
@@ -156,59 +148,4 @@ func main() {
 
 	// Точка входа для запуска всех зарегистрированных проверок
 	multichecker.Main(mychecks...)
-}
-
-// Логика собственного анализатора os.Exit
-func runOsExit(pass *analysis.Pass) (any, error) {
-	// Проверяем только пакет main
-	if pass.Pkg.Name() != "main" {
-		return nil, nil
-	}
-
-	for _, file := range pass.Files {
-		// Игнорируем тестовые файлы, так как в них os.Exit легален (например, в TestMain)
-		filename := pass.Fset.File(file.Pos()).Name()
-		if strings.HasSuffix(filename, "_test.go") {
-			continue
-		}
-
-		// Обходим AST-дерево текущего файла
-		ast.Inspect(file, func(node ast.Node) bool {
-			// Ищем объявления функций
-			funcDecl, ok := node.(*ast.FuncDecl)
-			if !ok {
-				return true
-			}
-
-			// Нас интересует только функция с именем "main"
-			if funcDecl.Name.Name != "main" {
-				return true
-			}
-
-			// Внутри функции main ищем выражения вызова функций
-			ast.Inspect(funcDecl.Body, func(n ast.Node) bool {
-				callExpr, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-
-				// Проверяем, является ли вызываемый объект селектором (пакет.Функция)
-				selExpr, ok := callExpr.Fun.(*ast.SelectorExpr)
-				if !ok {
-					return true
-				}
-
-				// Проверяем, что имя пакета "os", а имя функции "Exit"
-				if ident, ok := selExpr.X.(*ast.Ident); ok && ident.Name == "os" && selExpr.Sel.Name == "Exit" {
-					pass.Reportf(callExpr.Pos(), "direct call to os.Exit in main function is prohibited")
-				}
-
-				return true
-			})
-
-			return true
-		})
-	}
-
-	return nil, nil
 }

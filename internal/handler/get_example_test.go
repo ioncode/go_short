@@ -54,7 +54,9 @@ func ExampleGetUserSites() {
 		fmt.Printf("Ошибка выполнения запроса: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 

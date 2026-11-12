@@ -34,12 +34,12 @@ const (
 // CircuitBreaker реализует паттерн «предохранитель» для предотвращения
 // перегрузки удаленной системы и экономии ресурсов локальных воркеров при сбоях.
 type CircuitBreaker struct {
-	mu                   sync.RWMutex
-	state                State
-	failureCount         int
-	successCount         int
-	hasActiveTestRequest bool
-	openedAt             time.Time
+	openedAt             time.Time    // 24 байта
+	state                State        // 1 байт
+	hasActiveTestRequest bool         // 1 байт
+	failureCount         int          // 8 байт
+	successCount         int          // 8 байт
+	mu                   sync.RWMutex // 24 байта (уходит в самый низ)
 }
 
 // NewCircuitBreaker создает и инициализирует новый экземпляр CircuitBreaker.

@@ -23,8 +23,8 @@ import (
 type mockTransport struct {
 	t             *testing.T
 	roundTripFunc func(req *http.Request) (*http.Response, error)
-	calls         atomic.Int32
 	expectedEvent audit.Event
+	calls         atomic.Int32
 }
 
 // RoundTrip реализует стандартный интерфейс http.RoundTripper.

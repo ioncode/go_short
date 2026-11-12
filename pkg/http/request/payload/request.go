@@ -40,9 +40,9 @@ const (
 // Все внутренние поля строго приватны. Изменение и чтение состояния данных
 // возможны только через экспортируемый потокобезопасный интерфейс пакета.
 type Payload struct {
+	data     map[string]any
 	mu       sync.RWMutex
 	authorID uuid.UUID
-	data     map[string]any
 }
 
 // pool реализует глобальный sync.Pool для переиспользования памяти структур Payload.

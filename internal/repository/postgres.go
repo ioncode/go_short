@@ -84,7 +84,7 @@ func (r *PostgresSitesRepository) GetByUser(authorID uuid.UUID) ([]model.UserSit
 	// Читаем строки из БД
 	for rows.Next() {
 		var rec model.UserSitesResponseItem
-		err := rows.Scan(&rec.URL, &rec.Alias)
+		err = rows.Scan(&rec.URL, &rec.Alias)
 		if err != nil {
 			return records, err
 		}
@@ -337,7 +337,8 @@ func (r *PostgresSitesRepository) mergeStagingToMain(ctx context.Context, tx pgx
 	for dbRows.Next() {
 		var correlationID string
 		var shortURL model.ShortURL
-		if err := dbRows.Scan(&correlationID, &shortURL); err != nil {
+		err = dbRows.Scan(&correlationID, &shortURL)
+		if err != nil {
 			return nil, fmt.Errorf("scan merge returning row failed: %w", err)
 		}
 		// Мапим по гарантированно непустому ID текущего запроса

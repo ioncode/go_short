@@ -3,6 +3,7 @@ package main
 import (
 	"go/ast"
 	"go/types"
+	"os"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -20,9 +21,15 @@ func runOsExit(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 
+	cacheDir, _ := os.UserCacheDir()
+
 	for _, file := range pass.Files {
+		if ast.IsGenerated(file) {
+			continue
+		}
+
 		filename := pass.Fset.File(file.Pos()).Name()
-		if strings.HasSuffix(filename, "_test.go") {
+		if strings.HasSuffix(filename, "_test.go") || (cacheDir != "" && strings.HasPrefix(filename, cacheDir)) {
 			continue
 		}
 

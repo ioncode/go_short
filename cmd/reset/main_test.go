@@ -157,7 +157,7 @@ func TestGeneratedResetBehavior(t *testing.T) {
 }
 `
 	runtimeTestPath := filepath.Join(modelsDir, "reset_behavior_test.go")
-	if err := os.WriteFile(runtimeTestPath, []byte(runtimeTestCode), 0644); err != nil {
+	if err = os.WriteFile(runtimeTestPath, []byte(runtimeTestCode), 0644); err != nil {
 		t.Fatalf("не удалось записать reset_behavior_test.go: %v", err)
 	}
 

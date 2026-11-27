@@ -26,10 +26,10 @@ func (m *MockGetService) Get(alias model.ShortURL) (model.Site, error) {
 
 func TestGet(t *testing.T) {
 	tests := []struct {
-		name           string
-		expectedStatus int
-		expectedBody   string
-		mockBehavior   func(url string) (string, error)
+		mockBehavior   func(url string) (string, error) // 8 байт (указатель)
+		name           string                           // 16 байт (указатель + число)
+		expectedBody   string                           // 16 байт (указатель + число)
+		expectedStatus int                              // 8 байт (число)
 	}{
 		{
 			name:           "Correct request",

@@ -18,12 +18,12 @@ type obsLoop struct {
 // Auditor является центральным диспетчером (Subject), который распределяет
 // события по индивидуальным буферизованным очередям каждого наблюдателя.
 type Auditor struct {
-	ctx        context.Context
-	g          *errgroup.Group
-	logger     *zap.Logger
+	mu         sync.RWMutex
 	loops      []*obsLoop
 	bufferSize int
-	mu         sync.RWMutex
+	g          *errgroup.Group
+	ctx        context.Context
+	logger     *zap.Logger
 }
 
 // New инициализирует новый экземпляр Auditor.

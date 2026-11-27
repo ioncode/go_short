@@ -50,8 +50,8 @@ type SiteRepository interface {
 }
 
 type DeleteTask struct {
-	Aliases []model.ShortURL
 	Author  model.User
+	Aliases []model.ShortURL
 }
 
 // service struct

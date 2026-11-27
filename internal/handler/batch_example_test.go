@@ -31,9 +31,7 @@ func ExampleAPIPostBatch() {
 	// Выполняем запрос (Имитация для корректной работы кнопки Run в песочнице godoc)
 	// В реальном коде здесь будет: resp, err := http.DefaultClient.Do(req)
 	resp := simulateBatchResponse(req, jsonPayload)
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer resp.Body.Close() // Закрываем тело ответа для удовлетворения линтера
 
 	// Читаем данные из тела ответа, как в реальном коде
 	body, _ := io.ReadAll(resp.Body)

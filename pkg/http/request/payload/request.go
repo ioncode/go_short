@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/ioncode/go_short/pkg/pool"
 )
 
 // contextKey определяет приватный тип для ключа контекста,
@@ -41,39 +40,42 @@ const (
 // Все внутренние поля строго приватны. Изменение и чтение состояния данных
 // возможны только через экспортируемый потокобезопасный интерфейс пакета.
 type Payload struct {
-	data     map[string]any
 	mu       sync.RWMutex
 	authorID uuid.UUID
+	data     map[string]any
 }
 
-// pool реализует generic pool для переиспользования памяти структур Payload.
-var payloadPool = pool.New(func() *Payload {
-	return &Payload{
-		data: make(map[string]any, defaultMapCapacity),
-	}
-})
+// pool реализует глобальный sync.Pool для переиспользования памяти структур Payload.
+var pool = sync.Pool{
+	New: func() any {
+		return &Payload{
+			data: make(map[string]any, defaultMapCapacity),
+		}
+	},
+}
 
 // Get извлекает чистый, готовый к работе экземпляр Payload из пула.
 func Get() *Payload {
-	return payloadPool.Get()
+	return pool.Get().(*Payload)
 }
 
 // Release обнуляет все внутренние поля контейнера и возвращает его в глобальный пул.
+// Очистка внутренней мапы через range-delete сохраняет её выделенную емкость (capacity)
+// в куче, полностью предотвращая аллокации памяти при последующих запросах к серверу.
 func (p *Payload) Release() {
-	payloadPool.Put(p)
-}
-
-// Reset сбрасывает состояние контейнера к исходному с защитой от раздувания памяти.
-func (p *Payload) Reset() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.authorID = uuid.Nil
+	// Защита от раздувания памяти: если мапа стала слишком большой,
+	// сбрасываем её емкость, позволяя GC очистить память.
 	if len(p.data) > maxMapCapacity {
 		p.data = make(map[string]any, defaultMapCapacity)
 	} else {
-		clear(p.data)
+		for k := range p.data {
+			delete(p.data, k)
+		}
 	}
+	p.mu.Unlock()
+	pool.Put(p)
 }
 
 // =========================================================================

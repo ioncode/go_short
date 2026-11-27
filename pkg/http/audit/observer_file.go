@@ -12,10 +12,10 @@ import (
 // FileObserver записывает события аудита в файл методом потокового JSON-кодирования
 // и логирует внутренние ошибки записи через zap.Logger.
 type FileObserver struct {
-	mu      sync.Mutex
-	file    *os.File
-	encoder *json.Encoder
-	logger  *zap.Logger
+	file    *os.File      // 8 байт
+	encoder *json.Encoder // 8 байт
+	logger  *zap.Logger   // 8 байт (ровно 24 байта чистых указателей в начале!)
+	mu      sync.Mutex    // 8 байт (уходит в самый конец)
 }
 
 // NewFileObserver открывает файл, инициализирует JSON-энкодер и принимает логгер как зависимость.

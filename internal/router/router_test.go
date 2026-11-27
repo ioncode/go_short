@@ -38,9 +38,9 @@ func Test_middleware(t *testing.T) {
 		name           string
 		next           http.Handler
 		method         string
-		expectedStatus int
 		body           io.Reader
 		contentType    string
+		expectedStatus int
 	}{
 		{
 			name: "Get request without payload",

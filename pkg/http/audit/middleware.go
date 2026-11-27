@@ -2,7 +2,8 @@ package audit
 
 import (
 	"net/http"
-	"sync"
+
+	"github.com/ioncode/go_short/pkg/pool"
 )
 
 // responseWriterWrapper является декоратором для стандартного http.ResponseWriter,
@@ -18,27 +19,21 @@ func (rw *responseWriterWrapper) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-var wrapperPool = sync.Pool{
-	New: func() any {
-		return &responseWriterWrapper{}
-	},
-}
+var wrapperPool = pool.New(func() *responseWriterWrapper {
+	return &responseWriterWrapper{}
+})
 
-func getResponseWrapper() *responseWriterWrapper {
-	return wrapperPool.Get().(*responseWriterWrapper)
-}
-
-func (rw *responseWriterWrapper) release() {
+// Reset сбрасывает поля обёртки перед возвратом в пул.
+func (rw *responseWriterWrapper) Reset() {
 	rw.ResponseWriter = nil
 	rw.statusCode = 0
-	wrapperPool.Put(rw)
 }
 
 // Middleware возвращает chi-совместимый обработчик промежуточного ПО.
 func (a *Auditor) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wrapper := getResponseWrapper()
-		defer wrapper.release()
+		wrapper := wrapperPool.Get()
+		defer wrapperPool.Put(wrapper)
 		wrapper.ResponseWriter = w
 		wrapper.statusCode = http.StatusOK
 

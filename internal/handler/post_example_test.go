@@ -58,7 +58,11 @@ func ExampleAPIPost() {
 	endpointURL := mockServer.URL + "/api/shorten"
 
 	// 4. Выполняем HTTP POST запрос к нашему эмулируемому API
-	req, _ := http.NewRequest(http.MethodPost, endpointURL, bytes.NewBuffer(jsonPayload))
+	req, err := http.NewRequest(http.MethodPost, endpointURL, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		fmt.Printf("Ошибка создания запроса: %v\n", err)
+		return
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -66,7 +70,9 @@ func ExampleAPIPost() {
 		fmt.Printf("Ошибка выполнения запроса: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 

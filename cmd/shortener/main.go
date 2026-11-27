@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -18,7 +19,27 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+func printBuildInfo() {
+	fmt.Printf("Build version: %s\n", valueOrDefault(buildVersion))
+	fmt.Printf("Build date: %s\n", valueOrDefault(buildDate))
+	fmt.Printf("Build commit: %s\n", valueOrDefault(buildCommit))
+}
+
+func valueOrDefault(val string) string {
+	if val == "" {
+		return "N/A"
+	}
+	return val
+}
+
 func main() {
+	printBuildInfo()
 	// 1. Загружаем флаги конфигурации
 	cfg := config.ParseFlags()
 
@@ -87,7 +108,7 @@ func main() {
 	// g.Wait() каскадно отменит gCtx, запустив внутренний Shutdown для http.Server и Auditor.
 	if err := g.Wait(); err != nil {
 		logger.Log.Error("Приложение остановлено с ошибкой", zap.Error(err))
-		os.Exit(1)
+		return // Исправлено: просто выходим из main, давая отработать defer
 	}
 
 	logger.Log.Info("Приложение корректно остановлено")

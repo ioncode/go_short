@@ -52,13 +52,13 @@ func Test_main(t *testing.T) {
 		method                  string
 		path                    string
 		body                    string
-		expectedCode            int
 		expectedLocation        string
 		expectedBody            string
 		contentType             string
 		expectedContentType     string
 		contentEncoding         string
 		expectedContentEncoding string
+		expectedCode            int
 	}{
 		{
 			name:         "Short new site",

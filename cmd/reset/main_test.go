@@ -162,9 +162,10 @@ func TestGeneratedResetBehavior(t *testing.T) {
 	}
 
 	// 7. Запускаем go test внутри сгенерированного проекта
+	var output []byte
 	cmd := exec.Command("go", "test", "-v", "./...")
 	cmd.Dir = tempDir
-	output, err := cmd.CombinedOutput()
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("сгенерированный код не прошёл тесты:\n%s\nошибка: %v", string(output), err)
 	}

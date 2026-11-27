@@ -8,8 +8,8 @@ import (
 )
 
 type testObj struct {
-	ID    int
 	Items []string
+	ID    int
 }
 
 func (t *testObj) Reset() {
